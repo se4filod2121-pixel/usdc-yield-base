@@ -7,6 +7,9 @@ import {
   WalletDropdownDisconnect,
 } from "@coinbase/onchainkit/wallet";
 import { Avatar, Name } from "@coinbase/onchainkit/identity";
+import { Earn } from "@coinbase/onchainkit/earn";
+
+const SPARK_USDC_VAULT = "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A";
 
 export default function Home() {
   return (
@@ -16,9 +19,9 @@ export default function Home() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-start",
         gap: "2rem",
-        padding: "1.5rem",
+        padding: "3rem 1.5rem 4rem",
         background: "var(--bg)",
       }}
     >
@@ -84,7 +87,7 @@ export default function Home() {
           borderRadius: "1.25rem",
           padding: "2rem 1.75rem",
           width: "100%",
-          maxWidth: "22rem",
+          maxWidth: "28rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -100,6 +103,39 @@ export default function Home() {
             <WalletDropdownDisconnect />
           </WalletDropdown>
         </Wallet>
+      </div>
+
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: "1.25rem",
+          padding: "1.75rem",
+          width: "100%",
+          maxWidth: "28rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
+        }}
+      >
+        <div style={{ marginBottom: "0.75rem" }}>
+          <h2
+            style={{
+              fontSize: "1.05rem",
+              fontWeight: 700,
+              color: "var(--text)",
+              letterSpacing: "-0.01em",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Earn yield on your USDC
+          </h2>
+          <p style={{ fontSize: "0.825rem", color: "var(--muted)", lineHeight: 1.5 }}>
+            Deposit into the Spark USDC vault on Base and earn competitive on-chain yield.
+          </p>
+        </div>
+
+        <Earn vaultAddress={SPARK_USDC_VAULT} />
       </div>
     </main>
   );
