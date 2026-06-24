@@ -13,6 +13,15 @@ import { Earn } from "@coinbase/onchainkit/earn";
 const SPARK_USDC_VAULT = "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A";
 const MAX_RETRIES = 3;
 
+/* ─── shared card style ─── */
+const card: React.CSSProperties = {
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  borderRadius: "1.25rem",
+  width: "100%",
+  overflow: "hidden",
+};
+
 export default function Home() {
   const [earnKey, setEarnKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
@@ -46,17 +55,25 @@ export default function Home() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        gap: "2rem",
-        padding: "3rem 1.5rem 4rem",
+        gap: "1.25rem",
+        /* 16 px side padding — nothing can overflow this */
+        padding: "2.5rem 1rem 3rem",
         background: "var(--bg)",
+        width: "100%",
+        maxWidth: "30rem",
+        /* centre on wide screens */
+        marginInline: "auto",
       }}
     >
+      {/* ── hero ── */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "0.75rem",
+          gap: "0.625rem",
+          padding: "0 0.5rem",
+          textAlign: "center",
         }}
       >
         <div
@@ -68,6 +85,7 @@ export default function Home() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
           }}
         >
           <svg
@@ -84,40 +102,34 @@ export default function Home() {
         </div>
         <h1
           style={{
-            fontSize: "clamp(1.25rem, 5vw, 1.75rem)",
+            fontSize: "clamp(1.2rem, 5vw, 1.625rem)",
             fontWeight: 700,
             letterSpacing: "-0.02em",
             color: "var(--text)",
-            textAlign: "center",
           }}
         >
           Base Wallet
         </h1>
         <p
           style={{
-            fontSize: "0.9rem",
+            fontSize: "0.875rem",
             color: "var(--muted)",
-            textAlign: "center",
-            maxWidth: "22rem",
             lineHeight: 1.6,
+            maxWidth: "20rem",
           }}
         >
           Connect your wallet to get started on Base mainnet.
         </p>
       </div>
 
+      {/* ── wallet card ── */}
       <div
         style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "1.25rem",
-          padding: "2rem 1.75rem",
-          width: "100%",
-          maxWidth: "28rem",
+          ...card,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "1rem",
+          padding: "1.5rem 1.25rem",
         }}
       >
         <Wallet>
@@ -131,23 +143,18 @@ export default function Home() {
         </Wallet>
       </div>
 
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "1.25rem",
-          padding: "1.75rem",
-          width: "100%",
-          maxWidth: "28rem",
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.5rem",
-        }}
-      >
-        <div style={{ marginBottom: "0.75rem" }}>
+      {/* ── earn card ── */}
+      <div style={card}>
+        {/* header — gets its own padding inside the borderless card */}
+        <div
+          style={{
+            padding: "1.25rem 1.25rem 1rem",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
           <h2
             style={{
-              fontSize: "1.05rem",
+              fontSize: "1rem",
               fontWeight: 700,
               color: "var(--text)",
               letterSpacing: "-0.01em",
@@ -158,7 +165,7 @@ export default function Home() {
           </h2>
           <p
             style={{
-              fontSize: "0.825rem",
+              fontSize: "0.8125rem",
               color: "var(--muted)",
               lineHeight: 1.5,
             }}
@@ -168,6 +175,7 @@ export default function Home() {
           </p>
         </div>
 
+        {/* earn component — fills full card width; border/radius removed via CSS class */}
         {permanentError ? (
           <div
             style={{
@@ -175,7 +183,7 @@ export default function Home() {
               flexDirection: "column",
               alignItems: "center",
               gap: "1rem",
-              padding: "2rem 1rem",
+              padding: "1.75rem 1.25rem",
               textAlign: "center",
             }}
           >
@@ -190,10 +198,12 @@ export default function Home() {
                 color: "#fff",
                 border: "none",
                 borderRadius: "0.625rem",
-                padding: "0.6rem 1.5rem",
+                padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 600,
                 cursor: "pointer",
+                width: "100%",
+                maxWidth: "12rem",
               }}
             >
               Retry
@@ -202,6 +212,7 @@ export default function Home() {
               key={`fallback-${earnKey}`}
               vaultAddress={SPARK_USDC_VAULT}
               onError={handleEarnError}
+              className="earn-full-width"
             />
           </div>
         ) : (
@@ -209,6 +220,7 @@ export default function Home() {
             key={earnKey}
             vaultAddress={SPARK_USDC_VAULT}
             onError={handleEarnError}
+            className="earn-full-width"
           />
         )}
       </div>

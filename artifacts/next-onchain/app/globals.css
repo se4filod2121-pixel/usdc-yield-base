@@ -19,4 +19,14 @@ html, body {
   color: var(--text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Force OnchainKit's hardcoded w-[375px] Earn root to fill its container */
+.earn-full-width {
+  width: 100% !important;
+  min-width: 0 !important;
+  /* Neutralise the component's own border/radius — the card provides them */
+  border: none !important;
+  border-radius: 0 !important;
 }
