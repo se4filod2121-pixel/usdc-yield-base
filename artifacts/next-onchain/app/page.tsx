@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import {
   ConnectWallet,
   Wallet,
@@ -10,8 +11,33 @@ import { Avatar, Name } from "@coinbase/onchainkit/identity";
 import { Earn } from "@coinbase/onchainkit/earn";
 
 const SPARK_USDC_VAULT = "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A";
+const MAX_RETRIES = 3;
 
 export default function Home() {
+  const [earnKey, setEarnKey] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [permanentError, setPermanentError] = useState(false);
+
+  const handleEarnError = useCallback(
+    (err: { message?: string }) => {
+      console.error("[Earn] error:", err);
+      if (retryCount < MAX_RETRIES) {
+        const next = retryCount + 1;
+        setRetryCount(next);
+        setTimeout(() => setEarnKey((k) => k + 1), 1500 * next);
+      } else {
+        setPermanentError(true);
+      }
+    },
+    [retryCount]
+  );
+
+  const handleManualRetry = useCallback(() => {
+    setRetryCount(0);
+    setPermanentError(false);
+    setEarnKey((k) => k + 1);
+  }, []);
+
   return (
     <main
       style={{
@@ -130,12 +156,61 @@ export default function Home() {
           >
             Earn yield on your USDC
           </h2>
-          <p style={{ fontSize: "0.825rem", color: "var(--muted)", lineHeight: 1.5 }}>
-            Deposit into the Spark USDC vault on Base and earn competitive on-chain yield.
+          <p
+            style={{
+              fontSize: "0.825rem",
+              color: "var(--muted)",
+              lineHeight: 1.5,
+            }}
+          >
+            Deposit into the Spark USDC vault on Base and earn competitive
+            on-chain yield.
           </p>
         </div>
 
-        <Earn vaultAddress={SPARK_USDC_VAULT} />
+        {permanentError ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "1rem",
+              padding: "2rem 1rem",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
+              Vault data couldn&apos;t be loaded right now. Deposit and Withdraw
+              are still available — tap retry to reload APY details.
+            </p>
+            <button
+              onClick={handleManualRetry}
+              style={{
+                background: "var(--accent)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "0.625rem",
+                padding: "0.6rem 1.5rem",
+                fontSize: "0.875rem",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Retry
+            </button>
+            <Earn
+              key={`fallback-${earnKey}`}
+              vaultAddress={SPARK_USDC_VAULT}
+              onError={handleEarnError}
+            />
+          </div>
+        ) : (
+          <Earn
+            key={earnKey}
+            vaultAddress={SPARK_USDC_VAULT}
+            onError={handleEarnError}
+          />
+        )}
       </div>
     </main>
   );
