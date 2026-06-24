@@ -4,15 +4,14 @@ import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { base } from "viem/chains";
 import { type ReactNode, useState } from "react";
-import { WagmiProvider } from "wagmi";
-import { createConfig, http } from "wagmi";
-import { coinbaseWallet, metaMask } from "wagmi/connectors";
+import { WagmiProvider, createConfig, http } from "wagmi";
+import { coinbaseWallet, injected } from "wagmi/connectors";
 
 const wagmiConfig = createConfig({
   chains: [base],
   connectors: [
     coinbaseWallet({ appName: "OnchainKit App" }),
-    metaMask(),
+    injected(),
   ],
   transports: {
     [base.id]: http(),

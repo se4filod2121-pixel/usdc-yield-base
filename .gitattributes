@@ -1,0 +1,2 @@
+artifacts/next-onchain/.next/cache/webpack/client-development/1.pack.gz filter=lfs diff=lfs merge=lfs -text
+artifacts/next-onchain/.next/cache/webpack/server-development/0.pack.gz filter=lfs diff=lfs merge=lfs -text
