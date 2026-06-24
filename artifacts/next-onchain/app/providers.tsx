@@ -30,7 +30,16 @@ function MorphoFetchPatch() {
           : (input as Request).url;
 
       if (url === MORPHO_URL) {
-        return original(MORPHO_PROXY, init);
+        // Build a clean init with only plain ASCII headers so we never
+        // trigger "String contains non ISO-8859-1 code point".
+        const body =
+          init?.body ??
+          (input instanceof Request ? input.body : undefined);
+        return original(MORPHO_PROXY, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
       }
       return original(input, init);
     };
