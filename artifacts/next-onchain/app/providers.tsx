@@ -17,6 +17,10 @@ const wagmiConfig = createConfig({
   ssr: true,
 });
 
+/* ─── Morpho fetch patch ─────────────────────────────────────────────────────
+   Intercepts OnchainKit's hardcoded Morpho GraphQL URL and redirects it to our
+   /morpho-api proxy. Never throws under any circumstances.
+───────────────────────────────────────────────────────────────────────────── */
 function MorphoFetchPatch() {
   useEffect(() => {
     const original = window.fetch.bind(window);
@@ -25,10 +29,7 @@ function MorphoFetchPatch() {
       input: RequestInfo | URL,
       init?: RequestInit
     ): Promise<Response> {
-      // Top-level try/catch: patchedFetch must never throw.
-      // Any failure at any step falls back to the original fetch, untouched.
       try {
-        // ── 1. Safely resolve the URL string ──────────────────────────────
         let url: string | undefined;
         try {
           if (typeof input === "string") {
@@ -43,15 +44,10 @@ function MorphoFetchPatch() {
             url = (input as Request).url;
           }
         } catch {
-          // URL extraction failed — pass through unchanged
           return original(input, init);
         }
 
-        // ── 2. Only intercept the Morpho GraphQL endpoint ─────────────────
         if (url === MORPHO_URL) {
-          // Safely read the body from either init or the Request object.
-          // If anything throws, body stays undefined — the proxy will still work
-          // because fetchMorphoApy always sends the address in the body.
           let body: BodyInit | null | undefined;
           try {
             if (init?.body !== undefined) {
@@ -63,8 +59,6 @@ function MorphoFetchPatch() {
             body = undefined;
           }
 
-          // Send only plain ASCII headers — no forwarded headers that could
-          // contain non-ISO-8859-1 code points.
           return original(MORPHO_PROXY, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -72,17 +66,96 @@ function MorphoFetchPatch() {
           });
         }
       } catch {
-        // Outer catch: if anything above unexpectedly throws,
-        // delegate to original fetch without any modification.
         return original(input, init);
       }
 
-      // ── 3. Every other request: pass through completely untouched ─────────
       return original(input, init);
     };
 
     return () => {
       window.fetch = original;
+    };
+  }, []);
+
+  return null;
+}
+
+/* ─── Global image fallback patch ───────────────────────────────────────────
+   OnchainKit renders token logos inside internal components (e.g. the vault
+   info popover) that we cannot directly instrument with onError props.
+   This patch listens for image load errors anywhere in the document via
+   capture-phase event delegation, then replaces each broken <img> with a
+   styled circular badge — identical to the TokenLogo fallback in page.tsx.
+
+   Safety guarantees:
+   - data-fallback-applied prevents double-processing the same element.
+   - The entire handler is wrapped in try/catch so it can never throw.
+   - Only HTMLImageElement targets are processed; everything else is ignored.
+   - replaceWith() is no-op-safe if the element is no longer in the DOM.
+───────────────────────────────────────────────────────────────────────────── */
+function ImageFallbackPatch() {
+  useEffect(() => {
+    function handleImageError(e: Event) {
+      try {
+        const img = e.target;
+        if (!(img instanceof HTMLImageElement)) return;
+
+        // Prevent processing the same element twice.
+        if (img.dataset.fallbackApplied) return;
+        img.dataset.fallbackApplied = "true";
+
+        // Derive a size from rendered dimensions, then explicit attributes,
+        // then fall back to a sensible default.
+        const SIZE =
+          img.offsetWidth ||
+          img.offsetHeight ||
+          img.width ||
+          img.height ||
+          28;
+
+        // Label: prefer alt text, fall back to "$" (the dollar symbol
+        // is universally readable at very small sizes).
+        const label = img.alt ? img.alt.slice(0, 4).toUpperCase() : "$";
+        const fontSize = Math.max(Math.round(SIZE * 0.32), 7);
+
+        const badge = document.createElement("div");
+        badge.setAttribute("aria-label", label);
+        badge.setAttribute("role", "img");
+
+        // Mirror the TokenLogo fallback style exactly.
+        badge.style.cssText = [
+          `width:${SIZE}px`,
+          `height:${SIZE}px`,
+          `min-width:${SIZE}px`,
+          `border-radius:50%`,
+          `background:#2775CA`,
+          `display:inline-flex`,
+          `align-items:center`,
+          `justify-content:center`,
+          `font-size:${fontSize}px`,
+          `font-weight:800`,
+          `color:#ffffff`,
+          `letter-spacing:0.03em`,
+          `flex-shrink:0`,
+          `vertical-align:middle`,
+          `font-family:Arial,sans-serif`,
+          `line-height:1`,
+          `text-align:center`,
+          `user-select:none`,
+        ].join(";");
+
+        badge.textContent = label;
+        img.replaceWith(badge);
+      } catch {
+        // Never let a fallback failure surface as a console error.
+      }
+    }
+
+    // Capture phase ensures we see the event before any other listener,
+    // including React's synthetic event system.
+    document.addEventListener("error", handleImageError, true);
+    return () => {
+      document.removeEventListener("error", handleImageError, true);
     };
   }, []);
 
@@ -110,6 +183,7 @@ export function Providers({ children }: { children: ReactNode }) {
           chain={base}
         >
           <MorphoFetchPatch />
+          <ImageFallbackPatch />
           {children}
         </OnchainKitProvider>
       </QueryClientProvider>
