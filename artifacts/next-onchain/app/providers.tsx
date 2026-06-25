@@ -5,21 +5,35 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { base } from "viem/chains";
 import { type ReactNode, useEffect, useState } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { coinbaseWallet, injected } from "wagmi/connectors";
+import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 
 const MORPHO_URL = "https://blue-api.morpho.org/graphql";
 const MORPHO_PROXY = "/morpho-api";
 
+// WalletConnect requires a free project ID from https://cloud.walletconnect.com
+// Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in Replit Secrets to enable it.
+const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+
 const wagmiConfig = createConfig({
   chains: [base],
-  connectors: [coinbaseWallet({ appName: "OnchainKit App" }), injected()],
+  connectors: [
+    // Coinbase Wallet (Smart Wallet + Coinbase extension)
+    coinbaseWallet({ appName: "USDC Yield on Base" }),
+    // EIP-6963 injected wallets: MetaMask, Trust Wallet extension, Rabby, Brave, etc.
+    // Each installed wallet announces itself separately via EIP-6963, so all
+    // installed wallets appear as individual options in the connect modal.
+    injected(),
+    // WalletConnect: mobile wallets via QR code (Trust Wallet, Rainbow, etc.)
+    // Only active when NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set.
+    ...(wcProjectId ? [walletConnect({ projectId: wcProjectId, showQrModal: true })] : []),
+  ],
   transports: { [base.id]: http() },
   ssr: true,
 });
 
 /* ─── Morpho fetch patch ─────────────────────────────────────────────────────
-   Intercepts OnchainKit's hardcoded Morpho GraphQL URL and redirects it to our
-   /morpho-api proxy. Never throws under any circumstances.
+   Redirects OnchainKit's hardcoded Morpho URL to our /morpho-api proxy.
+   Never throws under any circumstances — full try/catch at every level.
 ───────────────────────────────────────────────────────────────────────────── */
 function MorphoFetchPatch() {
   useEffect(() => {
@@ -58,7 +72,6 @@ function MorphoFetchPatch() {
           } catch {
             body = undefined;
           }
-
           return original(MORPHO_PROXY, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -68,7 +81,6 @@ function MorphoFetchPatch() {
       } catch {
         return original(input, init);
       }
-
       return original(input, init);
     };
 
@@ -81,17 +93,9 @@ function MorphoFetchPatch() {
 }
 
 /* ─── Global image fallback patch ───────────────────────────────────────────
-   OnchainKit renders token logos inside internal components (e.g. the vault
-   info popover) that we cannot directly instrument with onError props.
-   This patch listens for image load errors anywhere in the document via
-   capture-phase event delegation, then replaces each broken <img> with a
-   styled circular badge — identical to the TokenLogo fallback in page.tsx.
-
-   Safety guarantees:
-   - data-fallback-applied prevents double-processing the same element.
-   - The entire handler is wrapped in try/catch so it can never throw.
-   - Only HTMLImageElement targets are processed; everything else is ignored.
-   - replaceWith() is no-op-safe if the element is no longer in the DOM.
+   Replaces broken <img> elements anywhere in the DOM (including inside
+   OnchainKit's internal components) with a styled circular badge — identical
+   to the TokenLogo fallback used in the vault picker rows.
 ───────────────────────────────────────────────────────────────────────────── */
 function ImageFallbackPatch() {
   useEffect(() => {
@@ -99,30 +103,17 @@ function ImageFallbackPatch() {
       try {
         const img = e.target;
         if (!(img instanceof HTMLImageElement)) return;
-
-        // Prevent processing the same element twice.
         if (img.dataset.fallbackApplied) return;
         img.dataset.fallbackApplied = "true";
 
-        // Derive a size from rendered dimensions, then explicit attributes,
-        // then fall back to a sensible default.
         const SIZE =
-          img.offsetWidth ||
-          img.offsetHeight ||
-          img.width ||
-          img.height ||
-          28;
-
-        // Label: prefer alt text, fall back to "$" (the dollar symbol
-        // is universally readable at very small sizes).
+          img.offsetWidth || img.offsetHeight || img.width || img.height || 28;
         const label = img.alt ? img.alt.slice(0, 4).toUpperCase() : "$";
         const fontSize = Math.max(Math.round(SIZE * 0.32), 7);
 
         const badge = document.createElement("div");
         badge.setAttribute("aria-label", label);
         badge.setAttribute("role", "img");
-
-        // Mirror the TokenLogo fallback style exactly.
         badge.style.cssText = [
           `width:${SIZE}px`,
           `height:${SIZE}px`,
@@ -143,20 +134,15 @@ function ImageFallbackPatch() {
           `text-align:center`,
           `user-select:none`,
         ].join(";");
-
         badge.textContent = label;
         img.replaceWith(badge);
       } catch {
-        // Never let a fallback failure surface as a console error.
+        // Never surface a fallback error to the console.
       }
     }
 
-    // Capture phase ensures we see the event before any other listener,
-    // including React's synthetic event system.
     document.addEventListener("error", handleImageError, true);
-    return () => {
-      document.removeEventListener("error", handleImageError, true);
-    };
+    return () => document.removeEventListener("error", handleImageError, true);
   }, []);
 
   return null;
@@ -176,7 +162,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <WagmiProvider config={wagmiConfig}>
+    // reconnectOnMount={false}: wagmi will NOT auto-reconnect a previously
+    // connected wallet on page load. Users must explicitly click "Connect Wallet".
+    <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}

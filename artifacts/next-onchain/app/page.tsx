@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import {
   ConnectWallet,
   Wallet,
@@ -9,6 +10,7 @@ import {
 } from "@coinbase/onchainkit/wallet";
 import { Avatar, Name } from "@coinbase/onchainkit/identity";
 import { Earn } from "@coinbase/onchainkit/earn";
+import { base } from "viem/chains";
 
 /* ─── vault registry ─── */
 const VAULTS = [
@@ -30,7 +32,7 @@ const VAULTS = [
 ] as const;
 
 type VaultAddress = (typeof VAULTS)[number]["address"];
-type ApyMap = Record<VaultAddress, number | null>; // null = loading / error
+type ApyMap = Record<VaultAddress, number | null>;
 
 const MAX_RETRIES = 3;
 
@@ -43,7 +45,7 @@ const card: React.CSSProperties = {
   overflow: "hidden",
 };
 
-/* ─── fetch one vault's APY from our proxy ─── */
+/* ─── fetch one vault's APY ─── */
 async function fetchVaultApy(address: string): Promise<number | null> {
   try {
     const res = await fetch("/morpho-api", {
@@ -61,16 +63,10 @@ async function fetchVaultApy(address: string): Promise<number | null> {
   }
 }
 
-/* ─── token logo with text fallback ─────────────────────────────────────────
-   Renders a circular token logo image. If the image fails to load (broken URL,
-   network error, or missing file) it immediately swaps to a solid-color badge
-   showing the token symbol — so a blank or broken image is never visible.
-─────────────────────────────────────────────────────────────────────────────*/
+/* ─── token logo with text fallback ─── */
 function TokenLogo({ symbol, src }: { symbol: string; src: string }) {
   const [failed, setFailed] = useState(false);
-
   const SIZE = 34;
-
   const circleStyle: React.CSSProperties = {
     width: SIZE,
     height: SIZE,
@@ -81,7 +77,6 @@ function TokenLogo({ symbol, src }: { symbol: string; src: string }) {
     justifyContent: "center",
     overflow: "hidden",
   };
-
   if (failed) {
     return (
       <div
@@ -101,7 +96,6 @@ function TokenLogo({ symbol, src }: { symbol: string; src: string }) {
       </div>
     );
   }
-
   return (
     <div style={circleStyle}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -141,8 +135,7 @@ function VaultPicker({
       {VAULTS.map((vault) => {
         const isSelected = vault.address === selected;
         const apy = apys[vault.address];
-        const apyLabel =
-          apy === null ? "—" : `${(apy * 100).toFixed(2)}%`;
+        const apyLabel = apy === null ? "—" : `${(apy * 100).toFixed(2)}%`;
 
         return (
           <button
@@ -169,7 +162,6 @@ function VaultPicker({
               gap: "0.625rem",
             }}
           >
-            {/* left: logo + name + protocol tag */}
             <div
               style={{
                 display: "flex",
@@ -180,7 +172,6 @@ function VaultPicker({
               }}
             >
               <TokenLogo symbol="USDC" src="/usdc.svg" />
-
               <div style={{ minWidth: 0 }}>
                 <div
                   style={{
@@ -209,7 +200,6 @@ function VaultPicker({
               </div>
             </div>
 
-            {/* right: APY badge */}
             <div
               style={{
                 flexShrink: 0,
@@ -249,9 +239,131 @@ function VaultPicker({
   );
 }
 
-/* ─── app icon (hero) ──────────────────────────────────────────────────────
-   Yield trend-line mark on Base blue — mirrors the favicon design.
-───────────────────────────────────────────────────────────────────────────*/
+/* ─── wrong network overlay ──────────────────────────────────────────────────
+   Shown inside the earn card area when the wallet is connected to a chain
+   other than Base mainnet. Blocks deposit/withdraw until the user switches.
+───────────────────────────────────────────────────────────────────────────── */
+function WrongNetworkOverlay({
+  onSwitch,
+  isPending,
+}: {
+  onSwitch: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "1rem",
+        padding: "2rem 1.25rem",
+        textAlign: "center",
+      }}
+    >
+      {/* warning icon */}
+      <div
+        style={{
+          width: "3rem",
+          height: "3rem",
+          borderRadius: "50%",
+          background: "rgba(251, 146, 60, 0.12)",
+          border: "1.5px solid rgba(251, 146, 60, 0.35)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            stroke="#fb923c"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      <div>
+        <p
+          style={{
+            fontSize: "0.9375rem",
+            fontWeight: 700,
+            color: "var(--text)",
+            margin: "0 0 0.375rem",
+          }}
+        >
+          Wrong Network
+        </p>
+        <p
+          style={{
+            fontSize: "0.8125rem",
+            color: "var(--muted)",
+            lineHeight: 1.55,
+            margin: 0,
+            maxWidth: "17rem",
+          }}
+        >
+          Deposits are only available on{" "}
+          <strong style={{ color: "var(--text)" }}>Base mainnet</strong>.
+          Switch your wallet to continue.
+        </p>
+      </div>
+
+      <button
+        onClick={onSwitch}
+        disabled={isPending}
+        style={{
+          background: isPending ? "rgba(0,82,255,0.5)" : "var(--accent)",
+          color: "#fff",
+          border: "none",
+          borderRadius: "0.75rem",
+          padding: "0.75rem 2rem",
+          fontSize: "0.9375rem",
+          fontWeight: 700,
+          cursor: isPending ? "default" : "pointer",
+          width: "100%",
+          maxWidth: "16rem",
+          transition: "background 0.15s",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "0.5rem",
+        }}
+      >
+        {isPending ? (
+          <>
+            <span
+              style={{
+                display: "inline-block",
+                width: "0.875rem",
+                height: "0.875rem",
+                borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.3)",
+                borderTopColor: "#fff",
+                animation: "spin 0.7s linear infinite",
+              }}
+            />
+            Switching…
+          </>
+        ) : (
+          "Switch to Base"
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* ─── app icon ─── */
 function AppIcon() {
   return (
     <div
@@ -290,6 +402,12 @@ function AppIcon() {
 
 /* ─── page ─── */
 export default function Home() {
+  /* wagmi hooks — must be inside WagmiProvider (provided by Providers wrapper) */
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const isOnBase = chainId === base.id;
+
   const [selectedVault, setSelectedVault] = useState<VaultAddress>(
     VAULTS[0].address
   );
@@ -347,170 +465,189 @@ export default function Home() {
 
   const selectedMeta = VAULTS.find((v) => v.address === selectedVault)!;
 
+  /* show wrong-network overlay inside the earn card when connected but off-Base */
+  const showNetworkOverlay = isConnected && !isOnBase;
+
   return (
-    <main
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-start",
-        gap: "1.125rem",
-        padding: "2.25rem 1rem 4rem",
-        background: "var(--bg)",
-        width: "100%",
-        maxWidth: "30rem",
-        marginInline: "auto",
-        boxSizing: "border-box",
-      }}
-    >
-      {/* ── hero ── */}
-      <div
+    <>
+      {/* keyframe for the switch spinner */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      <main
         style={{
+          minHeight: "100dvh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "0.625rem",
-          textAlign: "center",
+          justifyContent: "flex-start",
+          gap: "1.125rem",
+          padding: "2.25rem 1rem 4rem",
+          background: "var(--bg)",
           width: "100%",
+          maxWidth: "30rem",
+          marginInline: "auto",
+          boxSizing: "border-box",
         }}
       >
-        <AppIcon />
-        <h1
-          style={{
-            fontSize: "clamp(1.2rem, 5vw, 1.625rem)",
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
-            color: "var(--text)",
-            margin: 0,
-          }}
-        >
-          USDC Yield on Base
-        </h1>
-        <p
-          style={{
-            fontSize: "0.875rem",
-            color: "var(--muted)",
-            lineHeight: 1.6,
-            maxWidth: "19rem",
-            margin: 0,
-          }}
-        >
-          Connect your wallet and pick a vault to start earning.
-        </p>
-      </div>
-
-      {/* ── wallet card ── */}
-      <div
-        style={{
-          ...card,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          padding: "1.25rem",
-        }}
-      >
-        <Wallet>
-          <ConnectWallet>
-            <Avatar className="h-6 w-6" />
-            <Name />
-          </ConnectWallet>
-          <WalletDropdown>
-            <WalletDropdownDisconnect />
-          </WalletDropdown>
-        </Wallet>
-      </div>
-
-      {/* ── earn card ── */}
-      <div style={card}>
-        {/* card header */}
+        {/* ── hero ── */}
         <div
           style={{
-            padding: "1.125rem 1.125rem 0.875rem",
-            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.625rem",
+            textAlign: "center",
+            width: "100%",
           }}
         >
-          <h2
+          <AppIcon />
+          <h1
             style={{
-              fontSize: "0.9375rem",
+              fontSize: "clamp(1.2rem, 5vw, 1.625rem)",
               fontWeight: 700,
+              letterSpacing: "-0.02em",
               color: "var(--text)",
-              letterSpacing: "-0.01em",
-              margin: "0 0 0.25rem",
-            }}
-          >
-            Earn yield on your USDC
-          </h2>
-          <p
-            style={{
-              fontSize: "0.8125rem",
-              color: "var(--muted)",
-              lineHeight: 1.5,
               margin: 0,
             }}
           >
-            Choose a Morpho vault on Base and deposit USDC to earn yield.
+            USDC Yield on Base
+          </h1>
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "var(--muted)",
+              lineHeight: 1.6,
+              maxWidth: "19rem",
+              margin: 0,
+            }}
+          >
+            Connect your wallet and pick a vault to start earning.
           </p>
         </div>
 
-        {/* vault picker */}
-        <div style={{ borderBottom: "1px solid var(--border)" }}>
-          <VaultPicker
-            selected={selectedVault}
-            apys={apys}
-            onSelect={handleVaultSelect}
-          />
+        {/* ── wallet card ── */}
+        <div
+          style={{
+            ...card,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "1.25rem",
+          }}
+        >
+          <Wallet>
+            <ConnectWallet>
+              <Avatar className="h-6 w-6" />
+              <Name />
+            </ConnectWallet>
+            <WalletDropdown>
+              <WalletDropdownDisconnect />
+            </WalletDropdown>
+          </Wallet>
         </div>
 
-        {/* earn widget */}
-        {permanentError ? (
+        {/* ── earn card ── */}
+        <div style={card}>
+          {/* card header */}
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "1rem",
-              padding: "1.5rem 1.125rem",
-              textAlign: "center",
+              padding: "1.125rem 1.125rem 0.875rem",
+              borderBottom: "1px solid var(--border)",
             }}
           >
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: 0 }}>
-              Could not load vault data for {selectedMeta.name}. Deposit and
-              Withdraw are still available — tap Retry to reload.
-            </p>
-            <button
-              onClick={handleManualRetry}
+            <h2
               style={{
-                background: "var(--accent)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "0.625rem",
-                padding: "0.625rem 1.5rem",
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                width: "100%",
-                maxWidth: "12rem",
+                fontSize: "0.9375rem",
+                fontWeight: 700,
+                color: "var(--text)",
+                letterSpacing: "-0.01em",
+                margin: "0 0 0.25rem",
               }}
             >
-              Retry
-            </button>
+              Earn yield on your USDC
+            </h2>
+            <p
+              style={{
+                fontSize: "0.8125rem",
+                color: "var(--muted)",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Choose a Morpho vault on Base and deposit USDC to earn yield.
+            </p>
+          </div>
+
+          {/* vault picker — always visible so users can compare vaults */}
+          <div style={{ borderBottom: "1px solid var(--border)" }}>
+            <VaultPicker
+              selected={selectedVault}
+              apys={apys}
+              onSelect={handleVaultSelect}
+            />
+          </div>
+
+          {/* deposit / withdraw area */}
+          {showNetworkOverlay ? (
+            <WrongNetworkOverlay
+              onSwitch={() => switchChain({ chainId: base.id })}
+              isPending={isSwitching}
+            />
+          ) : permanentError ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "1rem",
+                padding: "1.5rem 1.125rem",
+                textAlign: "center",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  color: "var(--muted)",
+                  margin: 0,
+                }}
+              >
+                Could not load vault data for {selectedMeta.name}. Deposit and
+                Withdraw are still available — tap Retry to reload.
+              </p>
+              <button
+                onClick={handleManualRetry}
+                style={{
+                  background: "var(--accent)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "0.625rem",
+                  padding: "0.625rem 1.5rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  width: "100%",
+                  maxWidth: "12rem",
+                }}
+              >
+                Retry
+              </button>
+              <Earn
+                key={`fallback-${earnKey}`}
+                vaultAddress={selectedVault}
+                onError={handleEarnError}
+                className="earn-full-width"
+              />
+            </div>
+          ) : (
             <Earn
-              key={`fallback-${earnKey}`}
+              key={earnKey}
               vaultAddress={selectedVault}
               onError={handleEarnError}
               className="earn-full-width"
             />
-          </div>
-        ) : (
-          <Earn
-            key={earnKey}
-            vaultAddress={selectedVault}
-            onError={handleEarnError}
-            className="earn-full-width"
-          />
-        )}
-      </div>
-    </main>
+          )}
+        </div>
+      </main>
+    </>
   );
 }
