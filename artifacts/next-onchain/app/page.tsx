@@ -221,7 +221,7 @@ function WalletModal({
 
         {/* connector list */}
         {displayConnectors.map((connector) => {
-          const isThis = isPending && variables?.connector.id === connector.id;
+          const isThis = isPending && variables?.connector.id === connector.uid;
           return (
             <button
               key={connector.uid}
