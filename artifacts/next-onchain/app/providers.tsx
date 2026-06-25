@@ -19,28 +19,65 @@ const wagmiConfig = createConfig({
 
 function MorphoFetchPatch() {
   useEffect(() => {
-    const original = window.fetch;
+    const original = window.fetch.bind(window);
 
-    window.fetch = function patchedFetch(input, init) {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-          ? input.href
-          : (input as Request).url;
+    window.fetch = function patchedFetch(
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ): Promise<Response> {
+      // Top-level try/catch: patchedFetch must never throw.
+      // Any failure at any step falls back to the original fetch, untouched.
+      try {
+        // ── 1. Safely resolve the URL string ──────────────────────────────
+        let url: string | undefined;
+        try {
+          if (typeof input === "string") {
+            url = input;
+          } else if (input instanceof URL) {
+            url = input.href;
+          } else if (
+            input !== null &&
+            typeof input === "object" &&
+            typeof (input as Request).url === "string"
+          ) {
+            url = (input as Request).url;
+          }
+        } catch {
+          // URL extraction failed — pass through unchanged
+          return original(input, init);
+        }
 
-      if (url === MORPHO_URL) {
-        // Build a clean init with only plain ASCII headers so we never
-        // trigger "String contains non ISO-8859-1 code point".
-        const body =
-          init?.body ??
-          (input instanceof Request ? input.body : undefined);
-        return original(MORPHO_PROXY, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
+        // ── 2. Only intercept the Morpho GraphQL endpoint ─────────────────
+        if (url === MORPHO_URL) {
+          // Safely read the body from either init or the Request object.
+          // If anything throws, body stays undefined — the proxy will still work
+          // because fetchMorphoApy always sends the address in the body.
+          let body: BodyInit | null | undefined;
+          try {
+            if (init?.body !== undefined) {
+              body = init.body;
+            } else if (input instanceof Request) {
+              body = input.body as BodyInit;
+            }
+          } catch {
+            body = undefined;
+          }
+
+          // Send only plain ASCII headers — no forwarded headers that could
+          // contain non-ISO-8859-1 code points.
+          return original(MORPHO_PROXY, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+          });
+        }
+      } catch {
+        // Outer catch: if anything above unexpectedly throws,
+        // delegate to original fetch without any modification.
+        return original(input, init);
       }
+
+      // ── 3. Every other request: pass through completely untouched ─────────
       return original(input, init);
     };
 
