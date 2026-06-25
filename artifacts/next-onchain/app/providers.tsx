@@ -10,30 +10,44 @@ import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 const MORPHO_URL = "https://blue-api.morpho.org/graphql";
 const MORPHO_PROXY = "/morpho-api";
 
-// WalletConnect requires a free project ID from https://cloud.walletconnect.com
-// Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in Replit Secrets to enable it.
-const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+/* ─── wagmi config — singleton, client-only ──────────────────────────────────
+   walletConnect touches `indexedDB` on construction (SSR-unsafe).
+   We build the config lazily inside a useState initialiser (client-only) and
+   cache it in a module-level variable so React Strict Mode's double-invocation
+   doesn't construct a second WalletConnect core instance (which would log a
+   spurious "already initialized" warning in dev).
+───────────────────────────────────────────────────────────────────────────── */
+let _wagmiConfig: ReturnType<typeof createConfig> | null = null;
 
-const wagmiConfig = createConfig({
-  chains: [base],
-  connectors: [
-    // Coinbase Wallet (Smart Wallet + Coinbase extension)
-    coinbaseWallet({ appName: "USDC Yield on Base" }),
-    // EIP-6963 injected wallets: MetaMask, Trust Wallet extension, Rabby, Brave, etc.
-    // Each installed wallet announces itself separately via EIP-6963, so all
-    // installed wallets appear as individual options in the connect modal.
-    injected(),
-    // WalletConnect: mobile wallets via QR code (Trust Wallet, Rainbow, etc.)
-    // Only active when NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set.
-    ...(wcProjectId ? [walletConnect({ projectId: wcProjectId, showQrModal: true })] : []),
-  ],
-  transports: { [base.id]: http() },
-  ssr: true,
-});
+function buildWagmiConfig() {
+  if (_wagmiConfig) return _wagmiConfig;
+
+  const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+
+  _wagmiConfig = createConfig({
+    chains: [base],
+    connectors: [
+      // Coinbase Wallet (Smart Wallet + browser extension)
+      coinbaseWallet({ appName: "USDC Yield on Base" }),
+      // EIP-6963 injected wallets: MetaMask, Trust Wallet extension, Rabby …
+      // Each installed wallet self-announces and appears as a separate option.
+      injected(),
+      // WalletConnect: QR-code mobile wallets (Trust Wallet, Rainbow, etc.)
+      // Only included when the project ID secret is set.
+      ...(wcProjectId
+        ? [walletConnect({ projectId: wcProjectId, showQrModal: true })]
+        : []),
+    ],
+    transports: { [base.id]: http() },
+    ssr: true,
+  });
+
+  return _wagmiConfig;
+}
 
 /* ─── Morpho fetch patch ─────────────────────────────────────────────────────
-   Redirects OnchainKit's hardcoded Morpho URL to our /morpho-api proxy.
-   Never throws under any circumstances — full try/catch at every level.
+   Intercepts OnchainKit's hardcoded Morpho GraphQL URL and redirects it to
+   our /morpho-api proxy.  Never throws — full try/catch at every level.
 ───────────────────────────────────────────────────────────────────────────── */
 function MorphoFetchPatch() {
   useEffect(() => {
@@ -93,9 +107,8 @@ function MorphoFetchPatch() {
 }
 
 /* ─── Global image fallback patch ───────────────────────────────────────────
-   Replaces broken <img> elements anywhere in the DOM (including inside
-   OnchainKit's internal components) with a styled circular badge — identical
-   to the TokenLogo fallback used in the vault picker rows.
+   Capture-phase error listener — replaces broken <img> elements anywhere in
+   the DOM (including inside OnchainKit internals) with a styled circular badge.
 ───────────────────────────────────────────────────────────────────────────── */
 function ImageFallbackPatch() {
   useEffect(() => {
@@ -148,7 +161,14 @@ function ImageFallbackPatch() {
   return null;
 }
 
+/* ─── Providers ─────────────────────────────────────────────────────────────
+   wagmiConfig is created inside a useState initialiser so it runs only once
+   and only on the client — keeping indexedDB access out of SSR entirely.
+───────────────────────────────────────────────────────────────────────────── */
 export function Providers({ children }: { children: ReactNode }) {
+  // useState initialiser: called once, client-side only.
+  const [wagmiConfig] = useState(buildWagmiConfig);
+
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -162,8 +182,8 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    // reconnectOnMount={false}: wagmi will NOT auto-reconnect a previously
-    // connected wallet on page load. Users must explicitly click "Connect Wallet".
+    // reconnectOnMount={false}: never silently reconnect a previous session —
+    // the user must explicitly click "Connect Wallet".
     <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
