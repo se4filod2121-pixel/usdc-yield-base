@@ -30,7 +30,7 @@ const VAULTS = [
 ] as const;
 
 type VaultAddress = (typeof VAULTS)[number]["address"];
-type ApyMap = Record<VaultAddress, number | null>;   // null = loading / error
+type ApyMap = Record<VaultAddress, number | null>; // null = loading / error
 
 const MAX_RETRIES = 3;
 
@@ -61,6 +61,62 @@ async function fetchVaultApy(address: string): Promise<number | null> {
   }
 }
 
+/* ─── token logo with text fallback ─────────────────────────────────────────
+   Renders a circular token logo image. If the image fails to load (broken URL,
+   network error, or missing file) it immediately swaps to a solid-color badge
+   showing the token symbol — so a blank or broken image is never visible.
+─────────────────────────────────────────────────────────────────────────────*/
+function TokenLogo({ symbol, src }: { symbol: string; src: string }) {
+  const [failed, setFailed] = useState(false);
+
+  const SIZE = 34;
+
+  const circleStyle: React.CSSProperties = {
+    width: SIZE,
+    height: SIZE,
+    borderRadius: "50%",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  };
+
+  if (failed) {
+    return (
+      <div
+        style={{
+          ...circleStyle,
+          background: "#2775CA",
+          fontSize: "0.5rem",
+          fontWeight: 800,
+          color: "#fff",
+          letterSpacing: "0.03em",
+          textAlign: "center",
+          lineHeight: 1,
+        }}
+        aria-label={symbol}
+      >
+        {symbol}
+      </div>
+    );
+  }
+
+  return (
+    <div style={circleStyle}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={symbol}
+        width={SIZE}
+        height={SIZE}
+        style={{ width: SIZE, height: SIZE, objectFit: "cover" }}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
 /* ─── vault picker ─── */
 function VaultPicker({
   selected,
@@ -79,7 +135,7 @@ function VaultPicker({
         display: "flex",
         flexDirection: "column",
         gap: "0.5rem",
-        padding: "1rem 1rem 0.75rem",
+        padding: "0.875rem 0.875rem 0.75rem",
       }}
     >
       {VAULTS.map((vault) => {
@@ -99,7 +155,7 @@ function VaultPicker({
               alignItems: "center",
               justifyContent: "space-between",
               width: "100%",
-              padding: "0.75rem 1rem",
+              padding: "0.625rem 0.875rem",
               borderRadius: "0.75rem",
               border: isSelected
                 ? "1.5px solid var(--accent)"
@@ -110,33 +166,46 @@ function VaultPicker({
               cursor: "pointer",
               textAlign: "left",
               transition: "border-color 0.15s, background 0.15s",
-              gap: "0.5rem",
+              gap: "0.625rem",
             }}
           >
-            {/* left: name + protocol tag */}
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: isSelected ? "var(--text)" : "var(--text)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {vault.name}
-              </div>
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  color: "var(--muted)",
-                  marginTop: "0.125rem",
-                  letterSpacing: "0.02em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {vault.tag}
+            {/* left: logo + name + protocol tag */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.625rem",
+                minWidth: 0,
+                flex: 1,
+              }}
+            >
+              <TokenLogo symbol="USDC" src="/usdc.svg" />
+
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {vault.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.68rem",
+                    color: "var(--muted)",
+                    marginTop: "0.1rem",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    fontWeight: 500,
+                  }}
+                >
+                  {vault.tag}
+                </div>
               </div>
             </div>
 
@@ -150,10 +219,10 @@ function VaultPicker({
                 color: isSelected ? "#6e9eff" : "var(--muted)",
                 borderRadius: "999px",
                 padding: "0.2rem 0.625rem",
-                fontSize: "0.78rem",
+                fontSize: "0.75rem",
                 fontWeight: 700,
                 letterSpacing: "0.01em",
-                minWidth: "4.5rem",
+                minWidth: "4.75rem",
                 textAlign: "center",
                 fontVariantNumeric: "tabular-nums",
               }}
@@ -176,6 +245,45 @@ function VaultPicker({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/* ─── app icon (hero) ──────────────────────────────────────────────────────
+   Yield trend-line mark on Base blue — mirrors the favicon design.
+───────────────────────────────────────────────────────────────────────────*/
+function AppIcon() {
+  return (
+    <div
+      style={{
+        width: "3.25rem",
+        height: "3.25rem",
+        borderRadius: "0.875rem",
+        background: "var(--accent)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: "0 4px 20px rgba(0,82,255,0.35)",
+      }}
+    >
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 32 32"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <polyline
+          points="4,24 10,16 15,19 22,11"
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="22" cy="11" r="3" fill="white" />
+      </svg>
     </div>
   );
 }
@@ -247,12 +355,13 @@ export default function Home() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        gap: "1.25rem",
-        padding: "2.5rem 1rem 3rem",
+        gap: "1.125rem",
+        padding: "2.25rem 1rem 4rem",
         background: "var(--bg)",
         width: "100%",
         maxWidth: "30rem",
         marginInline: "auto",
+        boxSizing: "border-box",
       }}
     >
       {/* ── hero ── */}
@@ -262,53 +371,32 @@ export default function Home() {
           flexDirection: "column",
           alignItems: "center",
           gap: "0.625rem",
-          padding: "0 0.5rem",
           textAlign: "center",
+          width: "100%",
         }}
       >
-        <div
-          style={{
-            width: "3rem",
-            height: "3rem",
-            borderRadius: "0.75rem",
-            background: "var(--accent)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="10" stroke="white" strokeWidth="2" />
-            <circle cx="11" cy="11" r="4" fill="white" />
-          </svg>
-        </div>
+        <AppIcon />
         <h1
           style={{
             fontSize: "clamp(1.2rem, 5vw, 1.625rem)",
             fontWeight: 700,
             letterSpacing: "-0.02em",
             color: "var(--text)",
+            margin: 0,
           }}
         >
-          Base Wallet
+          USDC Yield on Base
         </h1>
         <p
           style={{
             fontSize: "0.875rem",
             color: "var(--muted)",
             lineHeight: 1.6,
-            maxWidth: "20rem",
+            maxWidth: "19rem",
+            margin: 0,
           }}
         >
-          Connect your wallet to get started on Base mainnet.
+          Connect your wallet and pick a vault to start earning.
         </p>
       </div>
 
@@ -319,7 +407,7 @@ export default function Home() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          padding: "1.5rem 1.25rem",
+          padding: "1.25rem",
         }}
       >
         <Wallet>
@@ -338,23 +426,30 @@ export default function Home() {
         {/* card header */}
         <div
           style={{
-            padding: "1.25rem 1.25rem 1rem",
+            padding: "1.125rem 1.125rem 0.875rem",
             borderBottom: "1px solid var(--border)",
           }}
         >
           <h2
             style={{
-              fontSize: "1rem",
+              fontSize: "0.9375rem",
               fontWeight: 700,
               color: "var(--text)",
               letterSpacing: "-0.01em",
-              marginBottom: "0.25rem",
+              margin: "0 0 0.25rem",
             }}
           >
             Earn yield on your USDC
           </h2>
-          <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5 }}>
-            Choose a vault and deposit USDC to earn on-chain yield on Base.
+          <p
+            style={{
+              fontSize: "0.8125rem",
+              color: "var(--muted)",
+              lineHeight: 1.5,
+              margin: 0,
+            }}
+          >
+            Choose a Morpho vault on Base and deposit USDC to earn yield.
           </p>
         </div>
 
@@ -375,13 +470,13 @@ export default function Home() {
               flexDirection: "column",
               alignItems: "center",
               gap: "1rem",
-              padding: "1.75rem 1.25rem",
+              padding: "1.5rem 1.125rem",
               textAlign: "center",
             }}
           >
-            <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-              Vault data for {selectedMeta.name} couldn&apos;t be loaded.
-              Deposit and Withdraw are still available — tap retry to reload.
+            <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: 0 }}>
+              Could not load vault data for {selectedMeta.name}. Deposit and
+              Withdraw are still available — tap Retry to reload.
             </p>
             <button
               onClick={handleManualRetry}

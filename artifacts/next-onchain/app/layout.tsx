@@ -15,11 +15,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OnchainKit App",
-  description: "Base mainnet wallet connect",
-  // Instructs Google's crawler (and Chrome's translate bar) not to translate
-  // this page, preventing injected non-ASCII characters from breaking fetch headers.
+  title: "USDC Yield on Base",
+  description:
+    "Earn on-chain yield on your USDC with Morpho vaults on Base mainnet. Compare live APYs and deposit in one tap.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
   other: {
+    // Tell Google Translate / crawler not to translate — prevents non-ASCII
+    // characters being injected into fetch headers or the DOM.
     google: "notranslate",
   },
 };
@@ -30,8 +36,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // suppressHydrationWarning on <html>: browser extensions (e.g. translators)
-    // can rewrite lang="en" before React hydrates — suppress that diff.
     <html
       lang="en"
       translate="no"
