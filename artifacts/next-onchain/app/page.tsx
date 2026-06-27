@@ -297,7 +297,7 @@ function VaultPicker({ selected, apys, onSelect }: { selected: VaultAddress; apy
               transition: "border-color 0.15s, background 0.15s", gap: "0.625rem",
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0, flex: 1 }}>
-              <TokenLogo symbol="USDC" src="/usdc.svg" />
+              <TokenLogo symbol="USDC" src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913/logo.png" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {vault.name}
