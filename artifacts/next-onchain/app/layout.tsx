@@ -46,6 +46,7 @@ export const metadata: Metadata = {
   },
   other: {
     google: "notranslate",
+    "base:app_id": "6a405c6b7590957b7706bafe",
   },
 };
 
