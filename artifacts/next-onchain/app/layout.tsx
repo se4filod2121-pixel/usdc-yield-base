@@ -23,9 +23,28 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
     apple: "/favicon.svg",
   },
+  openGraph: {
+    title: "USDC Yield on Base",
+    description: "Earn on-chain yield on your USDC with Morpho vaults on Base mainnet.",
+    url: "https://onbase-finance.vercel.app",
+    siteName: "USDC Yield on Base",
+    images: [
+      {
+        url: "https://placehold.co/1200x630/0052FF/ffffff?text=USDC+Yield+on+Base",
+        width: 1200,
+        height: 630,
+        alt: "USDC Yield on Base",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "USDC Yield on Base",
+    description: "Earn on-chain yield on your USDC with Morpho vaults on Base mainnet.",
+    images: ["https://placehold.co/1200x630/0052FF/ffffff?text=USDC+Yield+on+Base"],
+  },
   other: {
-    // Tell Google Translate / crawler not to translate — prevents non-ASCII
-    // characters being injected into fetch headers or the DOM.
     google: "notranslate",
   },
 };
