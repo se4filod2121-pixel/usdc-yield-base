@@ -280,31 +280,55 @@ function WalletModal({
 
 /* ─── vault picker ─── */
 function VaultPicker({ selected, apys, onSelect }: { selected: VaultAddress; apys: ApyMap; onSelect: (a: VaultAddress) => void }) {
+  const best = Object.entries(apys).reduce<{ addr: string | null; v: number }>((acc, [addr, v]) => {
+    if (v != null && v > acc.v) return { addr, v };
+    return acc;
+  }, { addr: null, v: -Infinity }).addr;
+
   return (
     <div role="listbox" aria-label="Select vault" style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.875rem 0.875rem 0.75rem" }}>
       {VAULTS.map((vault) => {
         const isSelected = vault.address === selected;
+        const isBest = vault.address === best;
         const apy = apys[vault.address];
         const apyLabel = apy === null ? "—" : `${(apy * 100).toFixed(2)}%`;
         return (
           <button key={vault.address} role="option" aria-selected={isSelected} onClick={() => onSelect(vault.address)}
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              width: "100%", padding: "0.625rem 0.875rem", borderRadius: "0.75rem",
+              width: "100%", padding: "0.7rem 0.875rem", borderRadius: "0.875rem",
               border: isSelected ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
-              background: isSelected ? "rgba(0,82,255,0.08)" : "transparent",
-              cursor: "pointer", textAlign: "left",
-              transition: "border-color 0.15s, background 0.15s", gap: "0.625rem",
+              background: isSelected
+                ? "linear-gradient(135deg, rgba(0,82,255,0.12), rgba(0,82,255,0.03))"
+                : "transparent",
+              boxShadow: isSelected ? "0 4px 18px rgba(0,82,255,0.18)" : "none",
+              cursor: "pointer", textAlign: "left", gap: "0.625rem",
+              transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0, flex: 1 }}>
               <TokenLogo symbol="USDC" src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913/logo.png" />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {vault.name}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {vault.name}
+                  </span>
+                  {isBest && (
+                    <span style={{
+                      fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.03em",
+                      color: "#4ade80", background: "rgba(74,222,128,0.12)",
+                      border: "1px solid rgba(74,222,128,0.3)", borderRadius: "999px",
+                      padding: "0.05rem 0.4rem", textTransform: "uppercase",
+                    }}>Best</span>
+                  )}
                 </div>
-                <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.1rem", letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 500 }}>
+                <span style={{
+                  display: "inline-block", marginTop: "0.2rem",
+                  fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                  padding: "0.1rem 0.5rem", borderRadius: "999px",
+                  background: "rgba(255,255,255,0.06)", color: "var(--muted)",
+                }}>
                   {vault.tag}
-                </div>
+                </span>
               </div>
             </div>
             <div style={{
