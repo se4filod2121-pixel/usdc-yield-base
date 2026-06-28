@@ -20,6 +20,8 @@ const Earn = dynamic(
   }
 );
 import type { Connector } from "wagmi";
+import { EarnProvider, EarnWithdraw } from "@coinbase/onchainkit/earn";
+import { CustomDepositPanel } from "./CustomDepositPanel";
 // (import must come after dynamic() call above — wagmi types are fine here)
 
 /* ─── vault registry ─── */
@@ -408,6 +410,7 @@ export default function Home() {
   const [selectedVault, setSelectedVault] = useState<VaultAddress>(VAULTS[0].address);
   const [apys, setApys] = useState<ApyMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as ApyMap);
   const [earnKey, setEarnKey] = useState(0);
+  const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
 
@@ -542,7 +545,27 @@ export default function Home() {
               <Earn key={`fallback-${earnKey}`} vaultAddress={selectedVault} onError={handleEarnError} className="earn-full-width" />
             </div>
           ) : (
-            <Earn key={earnKey} vaultAddress={selectedVault} onError={handleEarnError} className="earn-full-width" />
+            <>
+  <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
+    {(["deposit", "withdraw"] as const).map((t) => (
+      <button key={t} onClick={() => setDepositTab(t)} style={{
+        flex: 1, padding: "0.875rem 0", border: "none", cursor: "pointer",
+        background: depositTab === t ? "var(--accent)" : "transparent",
+        color: depositTab === t ? "#fff" : "var(--muted)",
+        fontWeight: 700, fontSize: "0.9375rem", textTransform: "capitalize",
+      }}>{t}</button>
+    ))}
+  </div>
+  {depositTab === "deposit" ? (
+    <EarnProvider vaultAddress={selectedVault}>
+      <CustomDepositPanel vaultAddress={selectedVault} />
+    </EarnProvider>
+  ) : (
+    <Earn key={earnKey} vaultAddress={selectedVault} onError={handleEarnError}>
+      <EarnWithdraw />
+    </Earn>
+  )}
+</>
           )}
         </div>
       </main>
