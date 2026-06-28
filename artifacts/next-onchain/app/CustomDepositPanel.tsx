@@ -25,11 +25,12 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
     const parsedAmount = parseUnits(amount, vaultToken.decimals);
     const feeAmount = (parsedAmount * FEE_BPS) / FEE_DENOMINATOR;
+    const netDepositAmount = parsedAmount - feeAmount;
 
     const depositCalls = await buildDepositToMorphoTx({
       vaultAddress,
       tokenAddress: vaultToken.address as `0x${string}`,
-      amount: parsedAmount,
+      amount: netDepositAmount,
       recipientAddress: address,
     });
 
