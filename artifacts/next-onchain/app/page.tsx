@@ -415,7 +415,7 @@ export default function Home() {
               <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0 }}>
                 <Avatar address={address} className="h-9 w-9" />
                 <div style={{ minWidth: 0 }}>
-                  <Name address={address} style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Name address={address} chain={base} style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
   <span slot="loading">{`${address.slice(0, 6)}...${address.slice(-4)}`}</span>
 </Name>
                   <p style={{ fontSize: "0.72rem", color: "var(--muted)", margin: 0 }}>
