@@ -125,6 +125,7 @@ function ConnectorIcon({ connector }: { connector: Connector }) {
 function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: () => void }) {
   const { connect, connectors, isPending, variables, error } = useConnect();
   const sheetRef = useRef<HTMLDivElement>(null);
+  const hasInjectedProvider = typeof window !== "undefined" && !!(window as any).ethereum;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -136,6 +137,7 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
 
   const displayConnectors = connectors.filter((c) => {
     if (c.id === "injected") {
+      if (!hasInjectedProvider) return false;
       const hasEip6963 = connectors.some((x) => x.id !== "injected" && x.type === "injected");
       return !hasEip6963;
     }
