@@ -177,7 +177,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       setErrorMessage(null);
       setAmount("");
     }
-  }, [amount, vaultToken]);
+  }, [amount, vaultToken, address]);
 
   if (!vaultToken) return null;
 
