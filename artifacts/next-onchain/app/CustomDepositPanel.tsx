@@ -148,7 +148,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     }
     if (status?.statusName === "success") {
       const hash = status?.statusData?.transactionReceipts?.[0]?.transactionHash;
-      if (hash && vaultToken) {
+      if (hash && vaultToken && address) {
         const entry: HistoryEntry = {
           hash,
           amount,
@@ -157,6 +157,22 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         };
         saveHistoryEntry(entry);
         setHistory(loadHistory());
+
+        const parsedAmount = parseUnits(amount, vaultToken.decimals);
+        const feeAmount = (parsedAmount * FEE_BPS) / FEE_DENOMINATOR;
+
+        fetch("/api/deposits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: address,
+            vaultAddress,
+            amount,
+            feeAmount: formatUnits(feeAmount, vaultToken.decimals),
+            tokenSymbol: vaultToken.symbol,
+            txHash: hash,
+          }),
+        }).catch((err) => console.error("[deposits] backend kayıt hatası:", err));
       }
       setErrorMessage(null);
       setAmount("");
