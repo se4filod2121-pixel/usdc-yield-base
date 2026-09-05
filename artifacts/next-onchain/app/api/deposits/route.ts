@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, depositsTable, insertDepositSchema } from "@workspace/db";
+import { db, depositsTable, insertDepositSchema } from "../../../lib/db";
 import { desc, sql } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
