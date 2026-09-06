@@ -10,13 +10,6 @@ import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 const MORPHO_URL = "https://blue-api.morpho.org/graphql";
 const MORPHO_PROXY = "/morpho-api";
 
-/* ─── wagmi config — singleton, client-only ──────────────────────────────────
-   walletConnect touches `indexedDB` on construction (SSR-unsafe).
-   We build the config lazily inside a useState initialiser (client-only) and
-   cache it in a module-level variable so React Strict Mode's double-invocation
-   doesn't construct a second WalletConnect core instance (which would log a
-   spurious "already initialized" warning in dev).
-───────────────────────────────────────────────────────────────────────────── */
 let _wagmiConfig: ReturnType<typeof createConfig> | null = null;
 
 function buildWagmiConfig() {
@@ -27,13 +20,8 @@ function buildWagmiConfig() {
   _wagmiConfig = createConfig({
     chains: [base],
     connectors: [
-      // Coinbase Wallet (Smart Wallet + browser extension)
       coinbaseWallet({ appName: "USDC Yield on Base" }),
-      // EIP-6963 injected wallets: MetaMask, Trust Wallet extension, Rabby …
-      // Each installed wallet self-announces and appears as a separate option.
       injected(),
-      // WalletConnect: QR-code mobile wallets (Trust Wallet, Rainbow, etc.)
-      // Only included when the project ID secret is set.
       ...(wcProjectId
         ? [walletConnect({ projectId: wcProjectId, showQrModal: true })]
         : []),
@@ -45,10 +33,6 @@ function buildWagmiConfig() {
   return _wagmiConfig;
 }
 
-/* ─── Morpho fetch patch ─────────────────────────────────────────────────────
-   Intercepts OnchainKit's hardcoded Morpho GraphQL URL and redirects it to
-   our /morpho-api proxy.  Never throws — full try/catch at every level.
-───────────────────────────────────────────────────────────────────────────── */
 function MorphoFetchPatch() {
   useEffect(() => {
     const original = window.fetch.bind(window);
@@ -106,10 +90,6 @@ function MorphoFetchPatch() {
   return null;
 }
 
-/* ─── Global image fallback patch ───────────────────────────────────────────
-   Capture-phase error listener — replaces broken <img> elements anywhere in
-   the DOM (including inside OnchainKit internals) with a styled circular badge.
-───────────────────────────────────────────────────────────────────────────── */
 function ImageFallbackPatch() {
   useEffect(() => {
     function handleImageError(e: Event) {
@@ -150,7 +130,6 @@ function ImageFallbackPatch() {
         badge.textContent = label;
         img.replaceWith(badge);
       } catch {
-        // Never surface a fallback error to the console.
       }
     }
 
@@ -161,12 +140,26 @@ function ImageFallbackPatch() {
   return null;
 }
 
-/* ─── Providers ─────────────────────────────────────────────────────────────
-   wagmiConfig is created inside a useState initialiser so it runs only once
-   and only on the client — keeping indexedDB access out of SSR entirely.
-───────────────────────────────────────────────────────────────────────────── */
+function ErrorDebugPatch() {
+  useEffect(() => {
+    function showError(msg: string) {
+      const el = document.createElement("div");
+      el.style.cssText =
+        "position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;padding:16px;font-size:14px;white-space:pre-wrap;max-height:80vh;overflow:auto;";
+      el.textContent = msg;
+      document.body.appendChild(el);
+    }
+    window.addEventListener("error", (e) =>
+      showError("ERROR: " + e.message + "\n" + (e.error?.stack || ""))
+    );
+    window.addEventListener("unhandledrejection", (e: any) =>
+      showError("REJECTION: " + (e.reason?.message || e.reason) + "\n" + (e.reason?.stack || ""))
+    );
+  }, []);
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
-  // useState initialiser: called once, client-side only.
   const [wagmiConfig] = useState(buildWagmiConfig);
 
   const [queryClient] = useState(
@@ -182,14 +175,13 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    // reconnectOnMount={false}: never silently reconnect a previous session —
-    // the user must explicitly click "Connect Wallet".
     <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
           chain={base}
         >
+          <ErrorDebugPatch />
           <MorphoFetchPatch />
           <ImageFallbackPatch />
           {children}
@@ -197,4 +189,4 @@ export function Providers({ children }: { children: ReactNode }) {
       </QueryClientProvider>
     </WagmiProvider>
   );
-}
+       }
