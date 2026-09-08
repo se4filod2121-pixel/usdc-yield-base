@@ -223,7 +223,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         </p>
       )}
 
-      <Transaction calls={buildCalls} onStatus={handleStatus}>
+      <Transaction calls={buildCalls} onStatus={handleStatus} isSponsored>
         <TransactionButton text="Deposit" />
       </Transaction>
 
