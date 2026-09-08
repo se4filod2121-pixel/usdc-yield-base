@@ -144,6 +144,8 @@ function ImageFallbackPatch() {
 
 function ErrorDebugPatch() {
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+
     function showError(msg: string) {
       const el = document.createElement("div");
       el.style.cssText =
@@ -151,12 +153,16 @@ function ErrorDebugPatch() {
       el.textContent = msg;
       document.body.appendChild(el);
     }
-    window.addEventListener("error", (e) =>
-      showError("ERROR: " + e.message + "\n" + (e.error?.stack || ""))
-    );
-    window.addEventListener("unhandledrejection", (e: any) =>
-      showError("REJECTION: " + (e.reason?.message || e.reason) + "\n" + (e.reason?.stack || ""))
-    );
+    const onError = (e: ErrorEvent) =>
+      showError("ERROR: " + e.message + "\n" + (e.error?.stack || ""));
+    const onRejection = (e: PromiseRejectionEvent) =>
+      showError("REJECTION: " + (e.reason?.message || e.reason) + "\n" + (e.reason?.stack || ""));
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
   }, []);
   return null;
 }
@@ -183,7 +189,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <OnchainKitProvider
             apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
             chain={base}
-            config={{ paymaster: "https://onbase-finance.vercel.app/api/paymaster" }}
+            config={{ paymaster: "/api/paymaster" }}
           >
             <ErrorDebugPatch />
             <MorphoFetchPatch />

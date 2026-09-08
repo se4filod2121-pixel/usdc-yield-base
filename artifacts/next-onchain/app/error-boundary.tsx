@@ -17,6 +17,7 @@ export class ErrorBoundary extends React.Component<
 
   render() {
     if (this.state.error) {
+      const isDev = process.env.NODE_ENV === "development";
       return (
         <div
           style={{
@@ -25,7 +26,7 @@ export class ErrorBoundary extends React.Component<
             left: 0,
             right: 0,
             zIndex: 99999,
-            background: "red",
+            background: isDev ? "red" : "#111827",
             color: "white",
             padding: 16,
             fontSize: 13,
@@ -34,7 +35,9 @@ export class ErrorBoundary extends React.Component<
             overflow: "auto",
           }}
         >
-          {"CAUGHT ERROR: " + this.state.error.message + "\n\n" + (this.state.error.stack || "")}
+          {isDev
+            ? "CAUGHT ERROR: " + this.state.error.message + "\n\n" + (this.state.error.stack || "")
+            : "Something went wrong. Please refresh the page and try again."}
         </div>
       );
     }

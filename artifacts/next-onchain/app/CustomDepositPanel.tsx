@@ -8,12 +8,10 @@ import {
   buildDepositToMorphoTx,
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
+import { computeFee } from "../lib/fee";
 
 // Your wallet address — receives the 0.1% fee.
 const FEE_RECIPIENT = "0x39795b0eba8c9fc0c1d05e99daa4a9a799be1d31" as `0x${string}`;
-// 10 basis points = 0.1% = 10/10000
-const FEE_BPS = 10n;
-const FEE_DENOMINATOR = 10000n;
 
 const HISTORY_KEY = "onbase_tx_history";
 const MAX_HISTORY = 10;
@@ -115,8 +113,13 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     setErrorMessage(null);
     if (!address || !vaultToken || !amount || parseFloat(amount) <= 0) return [];
 
+    if (walletBalance != null && parseFloat(amount) > parseFloat(walletBalance)) {
+      setErrorMessage(friendlyError("insufficient balance"));
+      return [];
+    }
+
     const parsedAmount = parseUnits(amount, vaultToken.decimals);
-    const feeAmount = (parsedAmount * FEE_BPS) / FEE_DENOMINATOR;
+    const feeAmount = computeFee(parsedAmount);
     const netDepositAmount = parsedAmount - feeAmount;
 
     // Official OnchainKit helper — builds the approve + deposit calls for the vault.
@@ -139,7 +142,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     };
 
     return feeAmount > 0n ? [...depositCalls, feeCall] : depositCalls;
-  }, [address, amount, vaultToken, vaultAddress]);
+  }, [address, amount, vaultToken, vaultAddress, walletBalance]);
 
   const handleStatus = useCallback((status: any) => {
     if (status?.statusName === "error") {
@@ -159,7 +162,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         setHistory(loadHistory());
 
         const parsedAmount = parseUnits(amount, vaultToken.decimals);
-        const feeAmount = (parsedAmount * FEE_BPS) / FEE_DENOMINATOR;
+        const feeAmount = computeFee(parsedAmount);
 
         fetch("/api/deposits", {
           method: "POST",
@@ -170,6 +173,8 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
             amount,
             feeAmount: formatUnits(feeAmount, vaultToken.decimals),
             tokenSymbol: vaultToken.symbol,
+            tokenAddress: vaultToken.address,
+            decimals: vaultToken.decimals,
             txHash: hash,
           }),
         }).catch((err) => console.error("[deposits] backend kayıt hatası:", err));
@@ -183,7 +188,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
   const feeAmountPreview =
     amount && parseFloat(amount) > 0
-      ? formatUnits((parseUnits(amount, vaultToken.decimals) * FEE_BPS) / FEE_DENOMINATOR, vaultToken.decimals)
+      ? formatUnits(computeFee(parseUnits(amount, vaultToken.decimals)), vaultToken.decimals)
       : "0";
 
   return (
