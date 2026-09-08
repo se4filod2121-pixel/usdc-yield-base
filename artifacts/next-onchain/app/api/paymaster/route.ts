@@ -1,10 +1,20 @@
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS });
+}
+
 export async function POST(req: Request) {
   const url = process.env.PAYMASTER_RPC_URL;
   if (!url) {
-    return new Response(
-      JSON.stringify({ error: "Paymaster not configured" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Paymaster not configured" }), {
+      status: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
   }
 
   const body = await req.json();
@@ -19,6 +29,6 @@ export async function POST(req: Request) {
 
   return new Response(JSON.stringify(data), {
     status: res.status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...CORS, "Content-Type": "application/json" },
   });
 }
