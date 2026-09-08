@@ -20,7 +20,7 @@ function buildWagmiConfig() {
   _wagmiConfig = createConfig({
     chains: [base],
     connectors: [
-      coinbaseWallet({ appName: "USDC Yield on Base" }),
+     // coinbaseWallet({ appName: "USDC Yield on Base" }),
       injected(),
       ...(wcProjectId
         ? [walletConnect({ projectId: wcProjectId, showQrModal: true })]
