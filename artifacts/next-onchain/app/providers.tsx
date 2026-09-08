@@ -180,17 +180,18 @@ export function Providers({ children }: { children: ReactNode }) {
     <ErrorBoundary>
       <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
         <QueryClientProvider client={queryClient}>
-        <OnchainKitProvider
-          apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-          chain={base}
-        >
-          <ErrorDebugPatch />
-          <MorphoFetchPatch />
-          <ImageFallbackPatch />
-          {children}
-        </OnchainKitProvider>
-      </QueryClientProvider>
+          <OnchainKitProvider
+            apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+            chain={base}
+            config={{ paymaster: "/api/paymaster" }}
+          >
+            <ErrorDebugPatch />
+            <MorphoFetchPatch />
+            <ImageFallbackPatch />
+            {children}
+          </OnchainKitProvider>
+        </QueryClientProvider>
       </WagmiProvider>
     </ErrorBoundary>
   );
-}
+                              }
