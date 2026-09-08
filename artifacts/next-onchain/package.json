@@ -13,7 +13,7 @@
     "next": "^15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "viem": "2.23.10",
+    "viem": "^2.23.10",
     "wagmi": "2.15.4",
     "@tanstack/react-query": "5.80.6",
     "drizzle-orm": "^0.36.4",
