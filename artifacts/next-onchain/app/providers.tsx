@@ -3,6 +3,7 @@ import { ErrorBoundary } from "./error-boundary";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { base } from "viem/chains";
+import { Attribution } from "ox/erc8021";
 import { type ReactNode, useEffect, useState } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
@@ -27,6 +28,7 @@ function buildWagmiConfig() {
         : []),
     ],
     transports: { [base.id]: http() },
+    dataSuffix: Attribution.toDataSuffix({ codes: ["bc_u6jkdbdd"] }),
     ssr: true,
   });
 
