@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { erc20Abi, parseUnits, encodeFunctionData, formatUnits } from "viem";
 import {
@@ -79,6 +79,14 @@ const ERROR_MESSAGES: Record<string, Record<string, string>> = {
     fr: "Une erreur s'est produite. Veuillez réessayer.",
     pt: "Algo deu errado. Tente novamente.",
   },
+  timeout: {
+    tr: "İşlem cüzdanınızdan çok uzun sürdü. Cüzdan uygulamanızı kontrol edin ve tekrar deneyin.",
+    en: "This is taking longer than expected. Check your wallet app and try again.",
+    es: "Esto está tardando más de lo esperado. Revisa tu billetera e intenta de nuevo.",
+    de: "Dies dauert länger als erwartet. Überprüfen Sie Ihre Wallet-App und versuchen Sie es erneut.",
+    fr: "Cela prend plus de temps que prévu. Vérifiez votre portefeuille et réessayez.",
+    pt: "Isso está demorando mais do que o esperado. Verifique seu aplicativo de carteira e tente novamente.",
+  },
 };
 
 function getUserLocale(): string {
@@ -87,16 +95,32 @@ function getUserLocale(): string {
   return ["tr", "en", "es", "de", "fr", "pt"].includes(lang) ? lang : "en";
 }
 
+function localizedMessage(key: keyof typeof ERROR_MESSAGES): string {
+  const locale = getUserLocale();
+  return ERROR_MESSAGES[key][locale] || ERROR_MESSAGES[key]["en"];
+}
+
 function friendlyError(raw: string): string {
   const msg = raw.toLowerCase();
-  const locale = getUserLocale();
   let key: keyof typeof ERROR_MESSAGES = "generic";
   if (msg.includes("insufficient") || msg.includes("exceeds balance")) key = "insufficient";
   else if (msg.includes("user rejected") || msg.includes("denied")) key = "rejected";
   else if (msg.includes("network") || msg.includes("chain")) key = "network";
   else if (msg.includes("execution reverted")) key = "reverted";
-  return ERROR_MESSAGES[key][locale] || ERROR_MESSAGES[key]["en"];
+  return localizedMessage(key);
 }
+
+// If the wallet never answers the sendCalls/paymaster request (e.g. a
+// paymaster misconfiguration, or the wallet app losing the handoff), the
+// OnchainKit <Transaction> component has no built-in timeout and its button
+// spins forever. Remounting it (via `key`) after a timeout clears that
+// stuck internal state so the user can retry.
+const PENDING_TIMEOUT_MS = 40_000;
+const PENDING_STATUS_NAMES = new Set([
+  "buildingTransaction",
+  "transactionPending",
+  "transactionLegacyExecuted",
+]);
 
 export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { address } = useAccount();
@@ -104,9 +128,14 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const [amount, setAmount] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [transactionKey, setTransactionKey] = useState(0);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
+    return () => {
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+    };
   }, []);
 
   const buildCalls = useCallback(async () => {
@@ -145,6 +174,19 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   }, [address, amount, vaultToken, vaultAddress, walletBalance]);
 
   const handleStatus = useCallback((status: any) => {
+    if (PENDING_STATUS_NAMES.has(status?.statusName)) {
+      if (!pendingTimerRef.current) {
+        pendingTimerRef.current = setTimeout(() => {
+          pendingTimerRef.current = null;
+          setErrorMessage(localizedMessage("timeout"));
+          setTransactionKey((k) => k + 1);
+        }, PENDING_TIMEOUT_MS);
+      }
+    } else if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+
     if (status?.statusName === "error") {
       const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
       setErrorMessage(friendlyError(String(raw)));
@@ -228,7 +270,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         </p>
       )}
 
-      <Transaction calls={buildCalls} onStatus={handleStatus} isSponsored>
+      <Transaction key={transactionKey} calls={buildCalls} onStatus={handleStatus} isSponsored>
         <TransactionButton text="Deposit" />
       </Transaction>
 
