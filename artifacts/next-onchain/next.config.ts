@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  typescript: { ignoreBuildErrors: true },
+  // No ESLint config/dependency in this package; ignoring during builds avoids
+  // Next.js prompting to interactively install ESLint in non-interactive CI.
   eslint: { ignoreDuringBuilds: true },
   webpack: (config) => {
     config.externals.push("pino-pretty", "lokijs", "encoding");
