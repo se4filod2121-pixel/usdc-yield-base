@@ -191,9 +191,15 @@ export function CustomWithdrawPanel() {
         </button>
       )}
 
-      <Transaction key={transactionKey} calls={withdrawCalls} onStatus={handleStatus}>
-        <TransactionButton text={withdrawAmountError ?? "Withdraw"} disabled={!!withdrawAmountError || !withdrawAmount} className="-mt-4" />
-      </Transaction>
+      <div style={{ marginTop: "0.75rem" }}>
+        <Transaction key={transactionKey} calls={withdrawCalls} onStatus={handleStatus}>
+          <TransactionButton
+            text={withdrawAmountError ?? "Withdraw"}
+            disabled={!!withdrawAmountError || !withdrawAmount}
+            className="tx-button"
+          />
+        </Transaction>
+      </div>
     </div>
   );
 }

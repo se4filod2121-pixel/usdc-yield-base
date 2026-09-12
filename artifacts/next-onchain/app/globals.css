@@ -22,11 +22,30 @@ html, body {
   overflow-x: hidden;
 }
 
-/* Force OnchainKit's hardcoded w-[375px] Earn root to fill its container */
-.earn-full-width {
-  width: 100% !important;
-  min-width: 0 !important;
-  /* Neutralise the component's own border/radius — the card provides them */
+.amount-input {
+  transition: border-color 0.15s, background 0.15s;
+}
+.amount-input:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  background: rgba(0, 82, 255, 0.06) !important;
+}
+
+/* Branded CTA for the deposit/withdraw <TransactionButton> — overrides
+   OnchainKit's own precompiled styles.css classes on the same element. */
+.tx-button {
+  background: linear-gradient(135deg, #0052ff, #2775ca) !important;
   border: none !important;
-  border-radius: 0 !important;
+  border-radius: 0.875rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 18px rgba(0, 82, 255, 0.3);
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+.tx-button:hover:not(:disabled) {
+  opacity: 0.92;
+}
+.tx-button:disabled {
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none;
+  color: var(--muted) !important;
 }

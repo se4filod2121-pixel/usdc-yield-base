@@ -266,6 +266,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       </div>
 
       <input
+        className="amount-input"
         inputMode="decimal"
         placeholder="0.0"
         value={amount}
@@ -313,7 +314,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       )}
 
       <Transaction key={transactionKey} calls={buildCalls} onStatus={handleStatus}>
-        <TransactionButton text="Deposit" />
+        <TransactionButton text="Deposit" className="tx-button" />
       </Transaction>
 
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0.75rem 0 0" }}>
@@ -345,4 +346,4 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       )}
     </div>
   );
-          }
+}
