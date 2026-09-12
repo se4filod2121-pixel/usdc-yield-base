@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { erc20Abi, parseUnits, encodeFunctionData, formatUnits } from "viem";
 import {
   useEarnContext,
@@ -126,33 +126,137 @@ const PENDING_STATUS_NAMES = new Set([
 
 export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const { vaultToken, apy, deposits, liquidity, walletBalance } = useEarnContext();
   const [amount, setAmount] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const settledRef = useRef(false);
 
-  const resetTransaction = useCallback(() => {
+  const clearPendingWatchers = useCallback(() => {
     if (pendingTimerRef.current) {
       clearTimeout(pendingTimerRef.current);
       pendingTimerRef.current = null;
     }
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const resetTransaction = useCallback(() => {
+    clearPendingWatchers();
+    settledRef.current = false;
     setShowRetry(false);
     setErrorMessage(null);
     setTransactionKey((k) => k + 1);
-  }, []);
+  }, [clearPendingWatchers]);
+
+  // Records a confirmed deposit exactly once, whichever of two paths detects
+  // it first: OnchainKit's own onStatus("success"), or our independent
+  // on-chain poll below (needed because onStatus has, in practice, gone
+  // silent on a deposit that had already succeeded on-chain).
+  const finalizeSuccess = useCallback(
+    (hash: string, ctx: { amount: string; symbol: string; decimals: number; tokenAddress: `0x${string}`; walletAddress: `0x${string}`; vaultAddress: `0x${string}` }) => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      clearPendingWatchers();
+      setShowRetry(false);
+      setErrorMessage(null);
+      // Reset the <Transaction> tree so its button leaves whatever internal
+      // state it was in (including a stuck spinner) and is ready for the
+      // next deposit — safe now that we've already recorded this one.
+      setTransactionKey((k) => k + 1);
+
+      const entry: HistoryEntry = { hash, amount: ctx.amount, symbol: ctx.symbol, timestamp: Date.now() };
+      saveHistoryEntry(entry);
+      setHistory(loadHistory());
+      setSuccessMessage(`${ctx.amount} ${ctx.symbol} başarıyla yatırıldı.`);
+
+      const parsedAmount = parseUnits(ctx.amount, ctx.decimals);
+      const feeAmount = computeFee(parsedAmount);
+
+      fetch("/api/deposits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: ctx.walletAddress,
+          vaultAddress: ctx.vaultAddress,
+          amount: ctx.amount,
+          feeAmount: formatUnits(feeAmount, ctx.decimals),
+          tokenSymbol: ctx.symbol,
+          tokenAddress: ctx.tokenAddress,
+          decimals: ctx.decimals,
+          txHash: hash,
+        }),
+      }).catch((err) => console.error("[deposits] backend kayıt hatası:", err));
+
+      setAmount("");
+    },
+    [clearPendingWatchers]
+  );
+
+  // Fallback for when the wallet has confirmed the batch but OnchainKit's
+  // status callback never reports it: watch the vault contract directly for
+  // a Transfer minting shares to this wallet, independent of the library.
+  const startFallbackPoll = useCallback(() => {
+    if (pollTimerRef.current || !publicClient || !address || !vaultToken) return;
+    const ctx = {
+      amount,
+      symbol: vaultToken.symbol,
+      decimals: vaultToken.decimals,
+      tokenAddress: vaultToken.address as `0x${string}`,
+      walletAddress: address,
+      vaultAddress,
+    };
+    let attempts = 0;
+    const MAX_ATTEMPTS = 36; // ~3 minutes at 5s
+    publicClient.getBlockNumber().then((fromBlock) => {
+      pollTimerRef.current = setInterval(async () => {
+        attempts += 1;
+        if (settledRef.current) return;
+        try {
+          const logs = await publicClient.getContractEvents({
+            address: vaultAddress,
+            abi: erc20Abi,
+            eventName: "Transfer",
+            args: { to: address },
+            fromBlock,
+            toBlock: "latest",
+          });
+          const mint = logs.find((log) => log.transactionHash);
+          if (mint?.transactionHash) {
+            finalizeSuccess(mint.transactionHash, ctx);
+            return;
+          }
+        } catch (err) {
+          console.error("[deposits] fallback poll hatası:", err);
+        }
+        if (attempts >= MAX_ATTEMPTS && pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }, 5000);
+    });
+  }, [publicClient, address, vaultToken, vaultAddress, amount, finalizeSuccess]);
 
   useEffect(() => {
     setHistory(loadHistory());
     return () => {
-      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+      clearPendingWatchers();
     };
-  }, []);
+  }, [clearPendingWatchers]);
 
   const buildCalls = useCallback(async () => {
+    clearPendingWatchers();
+    settledRef.current = false;
     setErrorMessage(null);
+    setSuccessMessage(null);
     if (!address || !vaultToken || !amount || parseFloat(amount) <= 0) return [];
 
     if (walletBalance != null && parseFloat(amount) > parseFloat(walletBalance)) {
@@ -184,62 +288,45 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     };
 
     return feeAmount > 0n ? [...depositCalls, feeCall] : depositCalls;
-  }, [address, amount, vaultToken, vaultAddress, walletBalance]);
+  }, [address, amount, vaultToken, vaultAddress, walletBalance, clearPendingWatchers]);
 
   const handleStatus = useCallback((status: any) => {
     if (PENDING_STATUS_NAMES.has(status?.statusName)) {
       if (!pendingTimerRef.current) {
         pendingTimerRef.current = setTimeout(() => {
           pendingTimerRef.current = null;
-          setErrorMessage(localizedMessage("timeout"));
-          setShowRetry(true);
+          if (!settledRef.current) {
+            setErrorMessage(localizedMessage("timeout"));
+            setShowRetry(true);
+          }
         }, PENDING_TIMEOUT_MS);
       }
+      startFallbackPoll();
     } else if (pendingTimerRef.current) {
       clearTimeout(pendingTimerRef.current);
       pendingTimerRef.current = null;
     }
 
     if (status?.statusName === "error") {
+      clearPendingWatchers();
       const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
       setErrorMessage(friendlyError(String(raw)));
       setShowRetry(false);
     }
-    if (status?.statusName === "success") {
-      setShowRetry(false);
+    if (status?.statusName === "success" && vaultToken && address) {
       const hash = status?.statusData?.transactionReceipts?.[0]?.transactionHash;
-      if (hash && vaultToken && address) {
-        const entry: HistoryEntry = {
-          hash,
+      if (hash) {
+        finalizeSuccess(hash, {
           amount,
           symbol: vaultToken.symbol,
-          timestamp: Date.now(),
-        };
-        saveHistoryEntry(entry);
-        setHistory(loadHistory());
-
-        const parsedAmount = parseUnits(amount, vaultToken.decimals);
-        const feeAmount = computeFee(parsedAmount);
-
-        fetch("/api/deposits", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: address,
-            vaultAddress,
-            amount,
-            feeAmount: formatUnits(feeAmount, vaultToken.decimals),
-            tokenSymbol: vaultToken.symbol,
-            tokenAddress: vaultToken.address,
-            decimals: vaultToken.decimals,
-            txHash: hash,
-          }),
-        }).catch((err) => console.error("[deposits] backend kayıt hatası:", err));
+          decimals: vaultToken.decimals,
+          tokenAddress: vaultToken.address as `0x${string}`,
+          walletAddress: address,
+          vaultAddress,
+        });
       }
-      setErrorMessage(null);
-      setAmount("");
     }
-  }, [amount, vaultToken, address]);
+  }, [amount, vaultToken, address, vaultAddress, clearPendingWatchers, startFallbackPoll, finalizeSuccess]);
 
   if (!vaultToken) return null;
 
@@ -263,7 +350,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         inputMode="decimal"
         placeholder="0.0"
         value={amount}
-        onChange={(e) => { setAmount(e.target.value); setErrorMessage(null); setShowRetry(false); }}
+        onChange={(e) => { setAmount(e.target.value); setErrorMessage(null); setSuccessMessage(null); setShowRetry(false); }}
         style={{
           width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
           border: "1.5px solid var(--border)", borderRadius: "0.875rem",
@@ -278,6 +365,12 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem" }}>
         Includes a 0.1% platform fee ({feeAmountPreview} {vaultToken.symbol})
       </p>
+
+      {successMessage && (
+        <p style={{ fontSize: "0.8125rem", color: "#4ade80", margin: "0 0 0.75rem", lineHeight: 1.5 }}>
+          {successMessage}
+        </p>
+      )}
 
       {errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "#f87171", margin: "0 0 0.75rem", lineHeight: 1.5 }}>
