@@ -79,8 +79,8 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       setTransactionKey((k) => k + 1);
 
       const entry: HistoryEntry = { hash, amount: ctx.amount, symbol: ctx.symbol, timestamp: Date.now() };
-      saveHistoryEntry(entry);
-      setHistory(loadHistory());
+      saveHistoryEntry(ctx.walletAddress, entry);
+      setHistory(loadHistory(ctx.walletAddress));
       setSuccessMessage(t("depositSuccess", { amount: ctx.amount, symbol: ctx.symbol }));
 
       const parsedAmount = parseUnits(ctx.amount, ctx.decimals);
@@ -151,11 +151,13 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   }, [publicClient, address, vaultToken, vaultAddress, amount, finalizeSuccess]);
 
   useEffect(() => {
-    setHistory(loadHistory());
+    // No wallet connected — never show a previously connected wallet's
+    // history to whoever is looking at the page now.
+    setHistory(address ? loadHistory(address) : []);
     return () => {
       clearPendingWatchers();
     };
-  }, [clearPendingWatchers]);
+  }, [clearPendingWatchers, address]);
 
   const buildCalls = useCallback(async () => {
     clearPendingWatchers();
@@ -335,7 +337,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         })}
       </p>
 
-      {history.length > 0 && (
+      {address && history.length > 0 && (
         <div style={{ marginTop: "1.25rem", borderTop: "1px solid var(--border)", paddingTop: "0.875rem" }}>
           <button
             onClick={() => setHistoryOpen((o) => !o)}
