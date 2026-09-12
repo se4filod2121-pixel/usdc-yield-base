@@ -14,8 +14,7 @@ import type { Connector } from "wagmi";
 import { CustomDepositPanel } from "./CustomDepositPanel";
 import { CustomWithdrawPanel } from "./CustomWithdrawPanel";
 
-const USDC_LOGO =
-  "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913/logo.png";
+const USDC_LOGO = "/usdc.svg";
 
 const VAULTS = [
   { address: "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A" as `0x${string}`, name: "Spark USDC", tag: "Spark" },
