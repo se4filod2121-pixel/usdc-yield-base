@@ -8,6 +8,7 @@ import {
   WithdrawAmountInput,
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
+import { useLocale } from "../lib/LocaleContext";
 import {
   friendlyError,
   localizedMessage,
@@ -32,6 +33,7 @@ const maxWithdrawAbi = [
 ] as const;
 
 export function CustomWithdrawPanel() {
+  const { locale, t } = useLocale();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const {
@@ -112,12 +114,12 @@ export function CustomWithdrawPanel() {
       setShowRetry(false);
       setErrorMessage(null);
       setIsProcessing(false);
-      setSuccessMessage(`${amount} ${symbol} başarıyla çekildi.`);
+      setSuccessMessage(t("withdrawSuccess", { amount, symbol }));
       setTransactionKey((k) => k + 1);
       setWithdrawAmount("");
       refetchDepositedBalance();
     },
-    [clearPendingWatchers, refetchDepositedBalance, setWithdrawAmount]
+    [clearPendingWatchers, refetchDepositedBalance, setWithdrawAmount, t]
   );
 
   // Fallback for when the wallet has confirmed the withdrawal but
@@ -170,7 +172,7 @@ export function CustomWithdrawPanel() {
           pendingTimerRef.current = setTimeout(() => {
             pendingTimerRef.current = null;
             if (!settledRef.current) {
-              setErrorMessage(localizedMessage("timeout"));
+              setErrorMessage(localizedMessage(locale, "timeout"));
               setShowRetry(true);
             }
           }, PENDING_TIMEOUT_MS);
@@ -185,7 +187,7 @@ export function CustomWithdrawPanel() {
         clearPendingWatchers();
         setIsProcessing(false);
         const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
-        setErrorMessage(friendlyError(String(raw)));
+        setErrorMessage(friendlyError(locale, String(raw)));
         setShowRetry(false);
       }
       if (status?.statusName === "success" && vaultToken) {
@@ -195,7 +197,7 @@ export function CustomWithdrawPanel() {
         }
       }
     },
-    [vaultToken, clearPendingWatchers, startFallbackPoll, finalizeSuccess]
+    [vaultToken, clearPendingWatchers, startFallbackPoll, finalizeSuccess, locale]
   );
 
   if (!vaultToken) return null;
@@ -218,7 +220,7 @@ export function CustomWithdrawPanel() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/usdc.svg" alt="" width={22} height={22} style={{ borderRadius: "50%", flexShrink: 0 }} />
           <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
-            Withdraw {vaultToken.symbol}
+            {t("withdrawHeader", { symbol: vaultToken.symbol })}
           </span>
         </div>
         <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
@@ -236,7 +238,7 @@ export function CustomWithdrawPanel() {
           <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
             {cappedMax.toFixed(4)} {vaultToken.symbol}
           </div>
-          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Available to withdraw</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{t("availableToWithdraw")}</div>
         </div>
         {cappedMax > 0 && (
           <button
@@ -244,21 +246,21 @@ export function CustomWithdrawPanel() {
             onClick={() => setWithdrawAmount(String(cappedMax))}
             style={{ background: "none", border: "none", color: "#6e9eff", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer" }}
           >
-            Use max
+            {t("useMax")}
           </button>
         )}
       </div>
 
       {liquidityLimited && (
         <p style={{ fontSize: "0.75rem", color: "#fb923c", margin: "0.5rem 0 0", lineHeight: 1.5 }}>
-          Vault şu anda anlık çekim için sınırlı likiditeye sahip — şu an en fazla {maxWithdrawableNum?.toFixed(4)} {vaultToken.symbol} çekebilirsiniz. Kalan bakiyeniz için daha sonra tekrar deneyin.
+          {t("liquidityLimited", { max: maxWithdrawableNum?.toFixed(4) ?? "0", symbol: vaultToken.symbol })}
         </p>
       )}
 
       {isProcessing && !successMessage && !errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0.75rem 0 0", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(23,184,214,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
-          İşleminiz cüzdanınızda onaylanıyor ve zincire yazılıyor — bu birkaç saniyeden bir dakikaya kadar sürebilir.
+          {t("processingMessage")}
         </p>
       )}
 
@@ -285,14 +287,14 @@ export function CustomWithdrawPanel() {
             color: "var(--text)", margin: "0.75rem 0 0", cursor: "pointer",
           }}
         >
-          Yeni bir işlem başlat
+          {t("startNewTransaction")}
         </button>
       )}
 
       <div style={{ marginTop: "0.75rem" }}>
         <Transaction key={transactionKey} calls={withdrawCalls} onStatus={handleStatus}>
           <TransactionButton
-            text={withdrawAmountError ?? (exceedsLiquidity ? "Yetersiz likidite" : "Withdraw")}
+            text={withdrawAmountError ?? (exceedsLiquidity ? t("insufficientLiquidity") : t("tabWithdraw"))}
             disabled={!!withdrawAmountError || !withdrawAmount || exceedsLiquidity}
             className="tx-button"
           />

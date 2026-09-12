@@ -7,6 +7,8 @@ import { Attribution } from "ox/erc8021";
 import { type ReactNode, useEffect, useState } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
+import { LocaleProvider } from "../lib/LocaleContext";
+import type { Locale } from "../lib/i18n";
 
 const MORPHO_URL = "https://blue-api.morpho.org/graphql";
 const MORPHO_PROXY = "/morpho-api";
@@ -167,7 +169,7 @@ function ErrorDebugPatch() {
   return null;
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children, initialLocale }: { children: ReactNode; initialLocale: Locale }) {
   const [wagmiConfig] = useState(buildWagmiConfig);
 
   const [queryClient] = useState(
@@ -184,6 +186,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ErrorBoundary>
+      <LocaleProvider initialLocale={initialLocale}>
       <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
         <QueryClientProvider client={queryClient}>
           <OnchainKitProvider
@@ -198,6 +201,7 @@ export function Providers({ children }: { children: ReactNode }) {
           </OnchainKitProvider>
         </QueryClientProvider>
       </WagmiProvider>
+      </LocaleProvider>
     </ErrorBoundary>
   );
-                              }
+}
