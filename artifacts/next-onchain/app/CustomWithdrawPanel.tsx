@@ -221,7 +221,7 @@ export function CustomWithdrawPanel() {
             Withdraw {vaultToken.symbol}
           </span>
         </div>
-        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
           APY {apy != null ? `${(apy * 100).toFixed(2)}%` : "—"}
         </span>
       </div>
@@ -233,7 +233,7 @@ export function CustomWithdrawPanel() {
         borderRadius: "0.875rem", padding: "0.75rem 1rem", marginTop: "0.5rem",
       }}>
         <div>
-          <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)" }}>
+          <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
             {cappedMax.toFixed(4)} {vaultToken.symbol}
           </div>
           <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Available to withdraw</div>

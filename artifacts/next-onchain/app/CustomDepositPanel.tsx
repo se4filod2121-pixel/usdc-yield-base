@@ -9,6 +9,7 @@ import {
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
 import { computeFee } from "../lib/fee";
+import { formatCompactNumber } from "../lib/format";
 import {
   friendlyError,
   localizedMessage,
@@ -270,7 +271,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
             Deposit {vaultToken.symbol}
           </span>
         </div>
-        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
           APY {apy != null ? `${(apy * 100).toFixed(2)}%` : "—"}
         </span>
       </div>
@@ -285,14 +286,14 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
           width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
           border: "1.5px solid var(--border)", borderRadius: "0.875rem",
           padding: "0.875rem 1rem", fontSize: "1.25rem", fontWeight: 600,
-          color: "var(--text)", marginBottom: "0.5rem",
+          color: "var(--text)", marginBottom: "0.5rem", fontVariantNumeric: "tabular-nums",
         }}
       />
 
-      <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "0 0 0.25rem" }}>
-        Wallet balance: {walletBalance ?? "—"} {vaultToken.symbol}
+      <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "0 0 0.25rem", fontVariantNumeric: "tabular-nums" }}>
+        Wallet balance: <span style={{ color: "var(--text)", fontWeight: 600 }}>{walletBalance ?? "—"} {vaultToken.symbol}</span>
       </p>
-      <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem" }}>
+      <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem", fontVariantNumeric: "tabular-nums" }}>
         Includes a 0.1% platform fee ({feeAmountPreview} {vaultToken.symbol})
       </p>
 
@@ -334,8 +335,8 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         <TransactionButton text="Deposit" className="tx-button" />
       </Transaction>
 
-      <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0.75rem 0 0" }}>
-        Vault: {deposits ?? "—"} {vaultToken.symbol} total deposits · {liquidity ?? "—"} liquidity
+      <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0.75rem 0 0", fontVariantNumeric: "tabular-nums" }}>
+        Vault: {deposits ? formatCompactNumber(deposits) : "—"} {vaultToken.symbol} total deposits · {liquidity ? formatCompactNumber(liquidity) : "—"} liquidity
       </p>
 
       {history.length > 0 && (
