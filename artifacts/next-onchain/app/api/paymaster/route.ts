@@ -78,6 +78,10 @@ export async function POST(req: Request) {
 
     const data = await res.json();
 
+    if (data && typeof data === "object" && "error" in data) {
+      console.error("[api/paymaster] upstream rejected:", JSON.stringify((data as { error: unknown }).error));
+    }
+
     return new Response(JSON.stringify(data), {
       status: res.status,
       headers: { ...CORS, "Content-Type": "application/json" },
