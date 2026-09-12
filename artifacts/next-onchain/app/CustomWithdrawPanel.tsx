@@ -257,7 +257,7 @@ export function CustomWithdrawPanel() {
 
       {isProcessing && !successMessage && !errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0.75rem 0 0", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(0,82,255,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+          <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(23,184,214,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
           İşleminiz cüzdanınızda onaylanıyor ve zincire yazılıyor — bu birkaç saniyeden bir dakikaya kadar sürebilir.
         </p>
       )}

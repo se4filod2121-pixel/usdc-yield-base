@@ -5,12 +5,16 @@
 }
 
 :root {
-  --bg: #0a0a0f;
-  --surface: #13131a;
-  --border: #2a2a3a;
-  --text: #f0f0ff;
-  --muted: #8888aa;
-  --accent: #0052ff;
+  --bg: #0a0f12;
+  --surface: #11181c;
+  --border: #223035;
+  --text: #f0f6f6;
+  --muted: #8296a0;
+  --accent: #17b8d6;
+  /* Decorative mark gradient (app icon/favicon) — full blue→teal→lime range. */
+  --brand-gradient: linear-gradient(135deg, #1652f0 0%, #17b8d6 55%, #a8e62b 100%);
+  /* Button gradient — stays dark enough end-to-end for white text. */
+  --button-gradient: linear-gradient(135deg, #1652f0, #17b8d6);
 }
 
 html, body {
@@ -28,17 +32,18 @@ html, body {
 .amount-input:focus {
   outline: none;
   border-color: var(--accent) !important;
-  background: rgba(0, 82, 255, 0.06) !important;
+  background: rgba(23, 184, 214, 0.08) !important;
 }
 
 /* Branded CTA for the deposit/withdraw <TransactionButton> — overrides
    OnchainKit's own precompiled styles.css classes on the same element. */
 .tx-button {
-  background: linear-gradient(135deg, #0052ff, #2775ca) !important;
+  background: var(--button-gradient) !important;
   border: none !important;
   border-radius: 0.875rem !important;
   font-weight: 700 !important;
-  box-shadow: 0 4px 18px rgba(0, 82, 255, 0.3);
+  color: #fff !important;
+  box-shadow: 0 4px 18px rgba(23, 184, 214, 0.35);
   transition: opacity 0.15s, box-shadow 0.15s;
 }
 .tx-button:hover:not(:disabled) {

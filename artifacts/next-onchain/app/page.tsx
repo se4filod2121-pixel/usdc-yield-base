@@ -87,7 +87,7 @@ function TokenLogo({ symbol, src, size = 34 }: { symbol: string; src?: string; s
 
 function connectorColor(name: string): string {
   const n = name.toLowerCase();
-  if (n.includes("coinbase")) return "#0052FF";
+  if (n.includes("coinbase")) return "#17B8D6";
   if (n.includes("metamask")) return "#E2761B";
   if (n.includes("walletconnect")) return "#3396FF";
   if (n.includes("trust")) return "#3375BB";
@@ -173,7 +173,7 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
             <button key={connector.uid} onClick={() => connect({ connector })} disabled={isPending} style={{
               display: "flex", alignItems: "center", gap: "0.875rem", width: "100%", padding: "0.875rem 1rem",
               borderRadius: "0.875rem", border: "1.5px solid var(--border)",
-              background: isThis ? "rgba(0,82,255,0.08)" : "transparent",
+              background: isThis ? "rgba(23,184,214,0.08)" : "transparent",
               cursor: isPending ? "default" : "pointer", textAlign: "left",
               transition: "background 0.15s, border-color 0.15s",
             }}>
@@ -190,7 +190,7 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
               {isThis ? (
                 <span style={{
                   width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                  border: "2.5px solid rgba(0,82,255,0.3)", borderTopColor: "var(--accent)",
+                  border: "2.5px solid rgba(23,184,214,0.3)", borderTopColor: "var(--accent)",
                   display: "inline-block", animation: "spin 0.7s linear infinite",
                 }} />
               ) : (
@@ -232,8 +232,8 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
               display: "flex", alignItems: "center", justifyContent: "space-between",
               width: "100%", padding: "0.7rem 0.875rem", borderRadius: "0.875rem",
               border: isSelected ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
-              background: isSelected ? "linear-gradient(135deg, rgba(0,82,255,0.12), rgba(0,82,255,0.03))" : "transparent",
-              boxShadow: isSelected ? "0 4px 18px rgba(0,82,255,0.18)" : "none",
+              background: isSelected ? "linear-gradient(135deg, rgba(23,184,214,0.14), rgba(23,184,214,0.03))" : "transparent",
+              boxShadow: isSelected ? "0 4px 18px rgba(23,184,214,0.2)" : "none",
               cursor: "pointer", textAlign: "left", gap: "0.625rem",
               transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
             }}>
@@ -305,7 +305,7 @@ function WrongNetworkOverlay({ onSwitch, isPending }: { onSwitch: () => void; is
         </p>
       </div>
       <button onClick={onSwitch} disabled={isPending} style={{
-        background: isPending ? "rgba(0,82,255,0.5)" : "var(--accent)",
+        background: isPending ? "rgba(23,184,214,0.5)" : "var(--accent)",
         color: "#fff", border: "none", borderRadius: "0.75rem",
         padding: "0.75rem 2rem", fontSize: "0.9375rem", fontWeight: 700,
         cursor: isPending ? "default" : "pointer",
@@ -324,9 +324,9 @@ function AppIcon() {
   return (
     <div style={{
       width: "3.25rem", height: "3.25rem", borderRadius: "0.875rem",
-      background: "linear-gradient(135deg, #0052FF, #2775CA)",
+      background: "var(--brand-gradient)",
       display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-      boxShadow: "0 4px 22px rgba(0,82,255,0.4)",
+      boxShadow: "0 4px 22px rgba(23,184,214,0.4)",
     }}>
       <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <polyline points="4,24 10,16 15,19 22,11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -408,8 +408,8 @@ export default function Home() {
         alignItems: "center", justifyContent: "flex-start",
         gap: "1.125rem", padding: "2.25rem 1rem 4rem",
         background:
-          "radial-gradient(circle at 20% 0%, rgba(0,82,255,0.12), transparent 50%)," +
-          "radial-gradient(circle at 80% 10%, rgba(39,117,202,0.10), transparent 45%)," +
+          "radial-gradient(circle at 20% 0%, rgba(22,82,240,0.14), transparent 50%)," +
+          "radial-gradient(circle at 80% 10%, rgba(23,184,214,0.14), transparent 45%)," +
           "var(--bg)",
         width: "100%", maxWidth: "30rem", marginInline: "auto", boxSizing: "border-box",
       }}>
@@ -446,11 +446,11 @@ export default function Home() {
             </div>
           ) : (
             <button onClick={() => setWalletModalOpen(true)} style={{
-              background: "linear-gradient(135deg, #0052FF, #2775CA)", color: "#fff", border: "none",
+              background: "var(--button-gradient)", color: "#fff", border: "none",
               borderRadius: "0.875rem", padding: "0.8125rem 2rem",
               fontSize: "0.9375rem", fontWeight: 700, cursor: "pointer",
               width: "100%", letterSpacing: "-0.01em",
-              boxShadow: "0 4px 18px rgba(0,82,255,0.3)",
+              boxShadow: "0 4px 18px rgba(23,184,214,0.35)",
             }}>Connect Wallet</button>
           )}
         </div>
