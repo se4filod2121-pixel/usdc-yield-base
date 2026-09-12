@@ -64,7 +64,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body
-        className={`notranslate ${geistSans.variable} ${geistMono.variable}`}
+        className={`notranslate base-dark ${geistSans.variable} ${geistMono.variable}`}
         translate="no"
         suppressHydrationWarning
       >
