@@ -189,7 +189,6 @@ export function Providers({ children }: { children: ReactNode }) {
           <OnchainKitProvider
             apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
             chain={base}
-            config={{ paymaster: "/api/paymaster" }}
           >
             <ErrorDebugPatch />
             <MorphoFetchPatch />
