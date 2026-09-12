@@ -355,17 +355,22 @@ function IdentityHeader({ address, isOnBase }: { address: `0x${string}`; isOnBas
 
 function AppIcon() {
   return (
-    <div style={{
-      width: "3.25rem", height: "3.25rem", borderRadius: "0.875rem",
-      background: "var(--brand-gradient)",
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-      boxShadow: "0 4px 22px rgba(23,184,214,0.4)",
-    }}>
-      <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <polyline points="4,24 10,16 15,19 22,11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="22" cy="11" r="3" fill="white" />
-      </svg>
-    </div>
+    <svg
+      width="3.25rem" height="3.25rem" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+      style={{ flexShrink: 0, filter: "drop-shadow(0 4px 22px rgba(23,184,214,0.4))" }}
+    >
+      <defs>
+        <linearGradient id="appIconGradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#1652F0" />
+          <stop offset="55%" stopColor="#17B8D6" />
+          <stop offset="100%" stopColor="#A8E62B" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="15.5" fill="#11181c" />
+      <circle cx="16" cy="16" r="12" fill="none" stroke="url(#appIconGradient)" strokeWidth="6.5" strokeLinecap="round" strokeDasharray="62 14" />
+      <polyline points="10.5,19.5 14,15.5 17,17.7 21,12.5" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="21" cy="12.5" r="2" fill="white" />
+    </svg>
   );
 }
 
