@@ -760,16 +760,16 @@ function NotificationSubscribe() {
 
 const REMINDER_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
 
-function DepositReminder() {
+function DepositReminder({ address }: { address: `0x${string}` }) {
   const { t } = useLocale();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const history = loadHistory();
+    const history = loadHistory(address);
     if (history.length === 0) return;
     const mostRecent = history[0].timestamp;
     if (Date.now() - mostRecent >= REMINDER_THRESHOLD_MS) setVisible(true);
-  }, []);
+  }, [address]);
 
   if (!visible) return null;
 
@@ -915,7 +915,7 @@ export default function Home() {
 
         {isConnected && address && (
           <>
-            <DepositReminder />
+            <DepositReminder address={address} />
             <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} />
             <PortfolioSummary address={address} />
             <ReferralBlock address={address} />
