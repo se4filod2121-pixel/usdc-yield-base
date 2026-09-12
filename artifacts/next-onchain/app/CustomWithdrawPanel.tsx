@@ -5,7 +5,6 @@ import { useAccount, usePublicClient } from "wagmi";
 import { erc20Abi } from "viem";
 import {
   useEarnContext,
-  EarnDetails,
   WithdrawAmountInput,
   WithdrawBalance,
 } from "@coinbase/onchainkit/earn";
@@ -23,6 +22,7 @@ export function CustomWithdrawPanel() {
   const {
     vaultAddress,
     vaultToken,
+    apy,
     withdrawAmount,
     setWithdrawAmount,
     withdrawCalls,
@@ -32,6 +32,7 @@ export function CustomWithdrawPanel() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,6 +57,7 @@ export function CustomWithdrawPanel() {
     settledRef.current = false;
     setShowRetry(false);
     setErrorMessage(null);
+    setIsProcessing(false);
     setTransactionKey((k) => k + 1);
   }, [clearPendingWatchers]);
 
@@ -72,6 +74,7 @@ export function CustomWithdrawPanel() {
       clearPendingWatchers();
       setShowRetry(false);
       setErrorMessage(null);
+      setIsProcessing(false);
       setSuccessMessage(`${amount} ${symbol} başarıyla çekildi.`);
       setTransactionKey((k) => k + 1);
       setWithdrawAmount("");
@@ -126,6 +129,7 @@ export function CustomWithdrawPanel() {
           settledRef.current = false;
           setErrorMessage(null);
           setSuccessMessage(null);
+          setIsProcessing(true);
           pendingTimerRef.current = setTimeout(() => {
             pendingTimerRef.current = null;
             if (!settledRef.current) {
@@ -142,6 +146,7 @@ export function CustomWithdrawPanel() {
 
       if (status?.statusName === "error") {
         clearPendingWatchers();
+        setIsProcessing(false);
         const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
         setErrorMessage(friendlyError(String(raw)));
         setShowRetry(false);
@@ -160,9 +165,27 @@ export function CustomWithdrawPanel() {
 
   return (
     <div style={{ padding: "1.125rem" }}>
-      <EarnDetails />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/usdc.svg" alt="" width={22} height={22} style={{ borderRadius: "50%", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
+            Withdraw {vaultToken.symbol}
+          </span>
+        </div>
+        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+          APY {apy != null ? `${(apy * 100).toFixed(2)}%` : "—"}
+        </span>
+      </div>
       <WithdrawAmountInput />
       <WithdrawBalance />
+
+      {isProcessing && !successMessage && !errorMessage && (
+        <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0.75rem 0 0", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(0,82,255,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+          İşleminiz cüzdanınızda onaylanıyor ve zincire yazılıyor — bu birkaç saniyeden bir dakikaya kadar sürebilir.
+        </p>
+      )}
 
       {successMessage && (
         <p style={{ fontSize: "0.8125rem", color: "#4ade80", margin: "0.75rem 0 0", lineHeight: 1.5 }}>

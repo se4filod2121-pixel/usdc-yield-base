@@ -44,38 +44,59 @@ async function getReceiptWithRetry(txHash: `0x${string}`) {
   }
 }
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+
 // Confirms the reported deposit corresponds to a real, successful
-// transaction sent by the claimed wallet that actually paid the platform
-// fee to FEE_RECIPIENT — so this endpoint can't be used to record
+// transaction that actually paid the platform fee (from the claimed
+// wallet, to FEE_RECIPIENT) — so this endpoint can't be used to record
 // fabricated deposits with made-up amounts/tx hashes.
+//
+// Note: `receipt.from` is NOT checked against `walletAddress` — for a
+// Coinbase Smart Wallet (or any ERC-4337-style account), the outer
+// transaction is submitted by a bundler, so `receipt.from` is the
+// bundler's address, never the user's. The wallet linkage instead comes
+// from the decoded Transfer log itself (its own `from`/`to` fields).
 async function verifyDepositOnChain(params: {
   txHash: `0x${string}`;
   walletAddress: `0x${string}`;
   tokenAddress: `0x${string}` | null;
+  vaultAddress: `0x${string}` | null;
   feeAmountRaw: bigint;
 }): Promise<boolean> {
-  const { txHash, walletAddress, tokenAddress, feeAmountRaw } = params;
+  const { txHash, walletAddress, tokenAddress, vaultAddress, feeAmountRaw } = params;
 
   const receipt = await getReceiptWithRetry(txHash);
   if (receipt.status !== "success") return false;
-  if (!isAddressEqual(receipt.from, walletAddress)) return false;
 
-  if (feeAmountRaw === 0n) return true;
-
-  return receipt.logs.some((log) => {
-    if (tokenAddress && !isAddressEqual(log.address, tokenAddress)) return false;
+  const decodedTransfers = receipt.logs.flatMap((log) => {
     try {
-      const decoded = decodeEventLog({
-        abi: erc20Abi,
-        data: log.data,
-        topics: log.topics,
-        eventName: "Transfer",
-      });
-      return isAddressEqual(decoded.args.to, FEE_RECIPIENT) && decoded.args.value === feeAmountRaw;
+      return [{ address: log.address, ...decodeEventLog({ abi: erc20Abi, data: log.data, topics: log.topics, eventName: "Transfer" }) }];
     } catch {
-      return false;
+      return [];
     }
   });
+
+  if (feeAmountRaw > 0n) {
+    const paidFee = decodedTransfers.some(
+      (t) =>
+        (!tokenAddress || isAddressEqual(t.address, tokenAddress)) &&
+        isAddressEqual(t.args.from, walletAddress) &&
+        isAddressEqual(t.args.to, FEE_RECIPIENT) &&
+        t.args.value === feeAmountRaw
+    );
+    if (paidFee) return true;
+  }
+
+  // No fee paid (or the fee-transfer log wasn't found): fall back to
+  // confirming the vault actually minted shares to this wallet in the
+  // same transaction.
+  if (!vaultAddress) return false;
+  return decodedTransfers.some(
+    (t) =>
+      isAddressEqual(t.address, vaultAddress) &&
+      isAddressEqual(t.args.from, ZERO_ADDRESS) &&
+      isAddressEqual(t.args.to, walletAddress)
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -130,6 +151,7 @@ export async function POST(req: NextRequest) {
         txHash: txHash as `0x${string}`,
         walletAddress: walletAddress as `0x${string}`,
         tokenAddress: tokenAddress as `0x${string}` | null,
+        vaultAddress: parsed.data.vaultAddress as `0x${string}` | null,
         feeAmountRaw,
       });
     } catch (err) {

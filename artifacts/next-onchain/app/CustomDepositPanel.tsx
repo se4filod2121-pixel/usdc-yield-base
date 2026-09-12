@@ -50,6 +50,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const [amount, setAmount] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
@@ -73,6 +74,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     settledRef.current = false;
     setShowRetry(false);
     setErrorMessage(null);
+    setIsProcessing(false);
     setTransactionKey((k) => k + 1);
   }, [clearPendingWatchers]);
 
@@ -87,6 +89,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       clearPendingWatchers();
       setShowRetry(false);
       setErrorMessage(null);
+      setIsProcessing(false);
       // Reset the <Transaction> tree so its button leaves whatever internal
       // state it was in (including a stuck spinner) and is ready for the
       // next deposit — safe now that we've already recorded this one.
@@ -176,6 +179,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     settledRef.current = false;
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsProcessing(false);
     if (!address || !vaultToken || !amount || parseFloat(amount) <= 0) return [];
 
     if (walletBalance != null && parseFloat(amount) > parseFloat(walletBalance)) {
@@ -212,6 +216,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const handleStatus = useCallback((status: any) => {
     if (PENDING_STATUS_NAMES.has(status?.statusName)) {
       if (!pendingTimerRef.current) {
+        setIsProcessing(true);
         pendingTimerRef.current = setTimeout(() => {
           pendingTimerRef.current = null;
           if (!settledRef.current) {
@@ -228,6 +233,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
     if (status?.statusName === "error") {
       clearPendingWatchers();
+      setIsProcessing(false);
       const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
       setErrorMessage(friendlyError(String(raw)));
       setShowRetry(false);
@@ -256,10 +262,14 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
   return (
     <div style={{ padding: "1.125rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
-          Deposit {vaultToken.symbol}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/usdc.svg" alt="" width={22} height={22} style={{ borderRadius: "50%", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
+            Deposit {vaultToken.symbol}
+          </span>
+        </div>
         <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
           APY {apy != null ? `${(apy * 100).toFixed(2)}%` : "—"}
         </span>
@@ -285,6 +295,13 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem" }}>
         Includes a 0.1% platform fee ({feeAmountPreview} {vaultToken.symbol})
       </p>
+
+      {isProcessing && !successMessage && !errorMessage && (
+        <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0 0 0.75rem", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(0,82,255,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+          İşleminiz cüzdanınızda onaylanıyor ve zincire yazılıyor — bu birkaç saniyeden bir dakikaya kadar sürebilir.
+        </p>
+      )}
 
       {successMessage && (
         <p style={{ fontSize: "0.8125rem", color: "#4ade80", margin: "0 0 0.75rem", lineHeight: 1.5 }}>
