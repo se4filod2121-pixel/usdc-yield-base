@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://onbase-finance.vercel.app"),
   title: "USDC Yield on Base",
   description:
     "Earn on-chain yield on your USDC with Morpho vaults on Base mainnet. Compare live APYs and deposit in one tap.",
@@ -30,9 +31,9 @@ export const metadata: Metadata = {
     siteName: "USDC Yield on Base",
     images: [
       {
-        url: "https://placehold.co/1200x630/0052FF/ffffff?text=USDC+Yield+on+Base",
-        width: 1200,
-        height: 630,
+        url: "/opengraph.jpg",
+        width: 1280,
+        height: 720,
         alt: "USDC Yield on Base",
       },
     ],
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "USDC Yield on Base",
     description: "Earn on-chain yield on your USDC with Morpho vaults on Base mainnet.",
-    images: ["https://placehold.co/1200x630/0052FF/ffffff?text=USDC+Yield+on+Base"],
+    images: ["/opengraph.jpg"],
   },
   other: {
     google: "notranslate",

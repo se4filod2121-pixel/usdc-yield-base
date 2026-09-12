@@ -25,7 +25,14 @@ const VAULTS = [
 
 type VaultAddress = (typeof VAULTS)[number]["address"];
 type ApyMap = Record<VaultAddress, number | null>;
+type TvlMap = Record<VaultAddress, number | null>;
 const MAX_RETRIES = 3;
+
+function formatUsdCompact(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
 
 const card: React.CSSProperties = {
   background: "var(--surface)",
@@ -35,19 +42,24 @@ const card: React.CSSProperties = {
   overflow: "hidden",
 };
 
-async function fetchVaultApy(address: string): Promise<number | null> {
+async function fetchVaultInfo(address: string): Promise<{ apy: number | null; tvlUsd: number | null }> {
   try {
     const res = await fetch("/morpho-api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ variables: { address } }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { apy: null, tvlUsd: null };
     const json = await res.json();
-    const netApy: number | undefined = json?.data?.vaultByAddress?.state?.netApy;
-    return typeof netApy === "number" ? netApy : null;
+    const state = json?.data?.vaultByAddress?.state;
+    const netApy: number | undefined = state?.netApy;
+    const totalAssetsUsd: number | undefined = state?.totalAssetsUsd;
+    return {
+      apy: typeof netApy === "number" ? netApy : null,
+      tvlUsd: typeof totalAssetsUsd === "number" ? totalAssetsUsd : null,
+    };
   } catch {
-    return null;
+    return { apy: null, tvlUsd: null };
   }
 }
 
@@ -201,7 +213,7 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
   );
 }
 
-function VaultPicker({ selected, apys, onSelect }: { selected: VaultAddress; apys: ApyMap; onSelect: (a: VaultAddress) => void }) {
+function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddress; apys: ApyMap; tvls: TvlMap; onSelect: (a: VaultAddress) => void }) {
   const best = Object.entries(apys).reduce<{ addr: string | null; v: number }>((acc, [addr, v]) => {
     if (v != null && v > acc.v) return { addr, v };
     return acc;
@@ -214,6 +226,7 @@ function VaultPicker({ selected, apys, onSelect }: { selected: VaultAddress; apy
         const isBest = vault.address === best;
         const apy = apys[vault.address];
         const apyLabel = apy === null ? "—" : `${(apy * 100).toFixed(2)}%`;
+        const tvl = tvls[vault.address];
         return (
           <button key={vault.address} role="option" aria-selected={isSelected} onClick={() => onSelect(vault.address)}
             style={{
@@ -249,6 +262,11 @@ function VaultPicker({ selected, apys, onSelect }: { selected: VaultAddress; apy
                 }}>
                   {vault.tag}
                 </span>
+                {tvl != null && (
+                  <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginLeft: "0.5rem" }}>
+                    {formatUsdCompact(tvl)} TVL
+                  </span>
+                )}
               </div>
             </div>
             <div style={{
@@ -328,17 +346,23 @@ export default function Home() {
 
   const [selectedVault, setSelectedVault] = useState<VaultAddress>(VAULTS[0].address);
   const [apys, setApys] = useState<ApyMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as ApyMap);
+  const [tvls, setTvls] = useState<TvlMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as TvlMap);
   const [earnKey, setEarnKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
   const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
 
   useEffect(() => {
-    Promise.all(VAULTS.map((v) => fetchVaultApy(v.address).then((apy) => ({ address: v.address, apy }))))
+    Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
       .then((results) => {
         setApys((prev) => {
           const next = { ...prev };
           for (const r of results) next[r.address] = r.apy;
+          return next;
+        });
+        setTvls((prev) => {
+          const next = { ...prev };
+          for (const r of results) next[r.address] = r.tvlUsd;
           return next;
         });
       });
@@ -370,6 +394,8 @@ export default function Home() {
 
   const selectedMeta = VAULTS.find((v) => v.address === selectedVault)!;
   const showNetworkOverlay = isConnected && !isOnBase;
+  const tvlValues = Object.values(tvls).filter((v): v is number => v != null);
+  const totalTvlUsd = tvlValues.length === VAULTS.length ? tvlValues.reduce((a, b) => a + b, 0) : null;
 
   return (
     <>
@@ -429,16 +455,27 @@ export default function Home() {
 
         <div style={card}>
           <div style={{ padding: "1.125rem 1.125rem 0.875rem", borderBottom: "1px solid var(--border)" }}>
-            <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", margin: "0 0 0.25rem" }}>
-              Earn yield on your USDC
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.25rem" }}>
+              <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", margin: 0 }}>
+                Earn yield on your USDC
+              </h2>
+              {totalTvlUsd != null && (
+                <span style={{
+                  fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)",
+                  background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)",
+                  borderRadius: "999px", padding: "0.2rem 0.625rem", whiteSpace: "nowrap",
+                }}>
+                  {formatUsdCompact(totalTvlUsd)} TVL
+                </span>
+              )}
+            </div>
             <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
               Choose a Morpho vault on Base and deposit USDC to earn yield.
             </p>
           </div>
 
           <div style={{ borderBottom: "1px solid var(--border)" }}>
-            <VaultPicker selected={selectedVault} apys={apys} onSelect={handleVaultSelect} />
+            <VaultPicker selected={selectedVault} apys={apys} tvls={tvls} onSelect={handleVaultSelect} />
           </div>
 
           {showNetworkOverlay ? (
@@ -476,6 +513,26 @@ export default function Home() {
             </>
           )}
         </div>
+
+        <footer style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem 0", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem", color: "var(--muted)" }}>
+            <span>Built on Base</span>
+            <span aria-hidden="true">·</span>
+            <span>Powered by Morpho</span>
+            <span aria-hidden="true">·</span>
+            <a
+              href={`https://basescan.org/address/${selectedVault}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}
+            >
+              View vault on Basescan
+            </a>
+          </div>
+          <p style={{ fontSize: "0.7rem", color: "var(--muted)", opacity: 0.7, maxWidth: "22rem", margin: 0, lineHeight: 1.5 }}>
+            Not financial advice. Depositing into a Morpho vault carries smart-contract risk. Do your own research.
+          </p>
+        </footer>
       </main>
 
       {walletModalOpen && (
