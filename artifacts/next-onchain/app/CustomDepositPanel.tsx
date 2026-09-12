@@ -34,6 +34,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -336,25 +337,41 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
       {history.length > 0 && (
         <div style={{ marginTop: "1.25rem", borderTop: "1px solid var(--border)", paddingTop: "0.875rem" }}>
-          <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", margin: "0 0 0.5rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
+              background: "transparent", border: "none", cursor: "pointer", padding: 0,
+              fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)",
+              textTransform: "uppercase", letterSpacing: "0.04em",
+            }}
+          >
             {t("recentTransactions")}
-          </p>
-          {history.map((h) => (
-            <a
-              key={h.hash}
-              href={`https://basescan.org/tx/${h.hash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "0.5rem 0", textDecoration: "none", color: "var(--text)",
-                fontSize: "0.8125rem", borderBottom: "1px solid rgba(255,255,255,0.04)",
-              }}
-            >
-              <span>{t("depositedLine", { amount: h.amount, symbol: h.symbol })}</span>
-              <span style={{ color: "#6e9eff", fontSize: "0.75rem" }}>BaseScan ↗</span>
-            </a>
-          ))}
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+              style={{ transform: historyOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {historyOpen && (
+            <div style={{ marginTop: "0.5rem" }}>
+              {history.map((h) => (
+                <a
+                  key={h.hash}
+                  href={`https://basescan.org/tx/${h.hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "0.5rem 0", textDecoration: "none", color: "var(--text)",
+                    fontSize: "0.8125rem", borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  }}
+                >
+                  <span>{t("depositedLine", { amount: h.amount, symbol: h.symbol })}</span>
+                  <span style={{ color: "#6e9eff", fontSize: "0.75rem" }}>BaseScan ↗</span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
