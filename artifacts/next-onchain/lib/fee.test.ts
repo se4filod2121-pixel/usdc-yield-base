@@ -18,3 +18,12 @@ test("computeFee never exceeds the deposited amount", () => {
   const amount = 5_000_000n;
   assert.ok(computeFee(amount) < amount);
 });
+
+test("computeFee halves the fee for a referred (discounted) deposit", () => {
+  assert.equal(computeFee(1_000_000n, true), 500n); // 0.05% instead of 0.1%
+});
+
+test("a discounted fee is never larger than the standard fee", () => {
+  const amount = 12_345_678n;
+  assert.ok(computeFee(amount, true) <= computeFee(amount, false));
+});

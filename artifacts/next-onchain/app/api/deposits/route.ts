@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, depositsTable, insertDepositSchema } from "@workspace/db";
+import { db, depositsTable, referralsTable, insertDepositSchema } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { computeFee } from "../../../lib/fee";
 import { rateLimit } from "../../../lib/rateLimit";
 import {
@@ -45,6 +46,25 @@ async function getReceiptWithRetry(txHash: `0x${string}`) {
 }
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+
+// Looked up independently server-side (never trusted from the client) so a
+// discount can't be claimed by a wallet that wasn't actually referred. Falls
+// back to "not referred" on any failure, including the referrals table not
+// existing yet in an environment that hasn't run the latest schema push —
+// a referral-lookup problem must never block or fail a real deposit.
+async function isReferredWallet(walletAddress: `0x${string}`): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ id: referralsTable.id })
+      .from(referralsTable)
+      .where(eq(referralsTable.referredAddress, walletAddress))
+      .limit(1);
+    return !!row;
+  } catch (err) {
+    console.error("[api/deposits] referral lookup failed, defaulting to no discount:", err);
+    return false;
+  }
+}
 
 // Confirms the reported deposit corresponds to a real, successful
 // transaction that actually paid the platform fee (from the claimed
@@ -143,8 +163,10 @@ export async function POST(req: NextRequest) {
 
     // The reported fee must match what our own fee schedule would produce for
     // the reported amount, so a real (verified) transaction can't be paired
-    // with an inflated `amount` to skew the deposit stats.
-    if (feeAmountRaw !== computeFee(amountRaw)) {
+    // with an inflated `amount` to skew the deposit stats. A referred wallet
+    // is allowed the discounted rate instead of the standard one.
+    const discounted = await isReferredWallet(walletAddress as `0x${string}`);
+    if (feeAmountRaw !== computeFee(amountRaw, discounted)) {
       return NextResponse.json({ error: "Fee amount does not match the deposit amount" }, { status: 400 });
     }
 

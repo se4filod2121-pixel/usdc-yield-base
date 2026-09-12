@@ -4,8 +4,8 @@ import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { base } from "viem/chains";
 import { Attribution } from "ox/erc8021";
-import { type ReactNode, useEffect, useState } from "react";
-import { WagmiProvider, createConfig, http } from "wagmi";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { WagmiProvider, createConfig, http, useAccount } from "wagmi";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 import { LocaleProvider } from "../lib/LocaleContext";
 import type { Locale } from "../lib/i18n";
@@ -169,6 +169,47 @@ function ErrorDebugPatch() {
   return null;
 }
 
+// Production error reporting: forwards uncaught errors/rejections to our own
+// best-effort logging endpoint. Dev keeps the on-screen ErrorDebugPatch
+// instead — this only runs in production so local errors don't spam the DB.
+function ErrorReportPatch() {
+  const { address } = useAccount();
+  const addressRef = useRef(address);
+  addressRef.current = address;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+
+    function report(message: string, stack?: string) {
+      fetch("/api/errors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          stack,
+          url: window.location.href,
+          walletAddress: addressRef.current,
+        }),
+      }).catch(() => {
+        // logging endpoint unreachable — nothing more we can do client-side
+      });
+    }
+
+    const onError = (e: ErrorEvent) => report(e.message, e.error?.stack);
+    const onRejection = (e: PromiseRejectionEvent) =>
+      report(String(e.reason?.message ?? e.reason), e.reason?.stack);
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  return null;
+}
+
 export function Providers({ children, initialLocale }: { children: ReactNode; initialLocale: Locale }) {
   const [wagmiConfig] = useState(buildWagmiConfig);
 
@@ -195,6 +236,7 @@ export function Providers({ children, initialLocale }: { children: ReactNode; in
             config={{ appearance: { mode: "dark", theme: "base" } }}
           >
             <ErrorDebugPatch />
+            <ErrorReportPatch />
             <MorphoFetchPatch />
             <ImageFallbackPatch />
             {children}

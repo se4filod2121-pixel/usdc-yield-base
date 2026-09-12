@@ -11,6 +11,8 @@ import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction
 import { computeFee } from "../lib/fee";
 import { formatCompactNumber } from "../lib/format";
 import { useLocale } from "../lib/LocaleContext";
+import { useReferral } from "../lib/useReferral";
+import { loadHistory, saveHistoryEntry, type HistoryEntry } from "../lib/txHistory";
 import {
   friendlyError,
   localizedMessage,
@@ -21,34 +23,11 @@ import {
 // Your wallet address — receives the 0.1% fee.
 const FEE_RECIPIENT = "0x39795b0eba8c9fc0c1d05e99daa4a9a799be1d31" as `0x${string}`;
 
-const HISTORY_KEY = "onbase_tx_history";
-const MAX_HISTORY = 10;
-
-type HistoryEntry = { hash: string; amount: string; symbol: string; timestamp: number };
-
-function loadHistory(): HistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistoryEntry(entry: HistoryEntry) {
-  try {
-    const current = loadHistory();
-    const next = [entry, ...current].slice(0, MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  } catch {
-    // localStorage unavailable — silently skip, not critical
-  }
-}
-
 export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { locale, t } = useLocale();
   const { address } = useAccount();
   const publicClient = usePublicClient();
+  const { discounted } = useReferral(address);
   const { vaultToken, apy, deposits, liquidity, walletBalance } = useEarnContext();
   const [amount, setAmount] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -104,7 +83,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       setSuccessMessage(t("depositSuccess", { amount: ctx.amount, symbol: ctx.symbol }));
 
       const parsedAmount = parseUnits(ctx.amount, ctx.decimals);
-      const feeAmount = computeFee(parsedAmount);
+      const feeAmount = computeFee(parsedAmount, discounted);
 
       fetch("/api/deposits", {
         method: "POST",
@@ -123,7 +102,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
       setAmount("");
     },
-    [clearPendingWatchers, t]
+    [clearPendingWatchers, t, discounted]
   );
 
   // Fallback for when the wallet has confirmed the batch but OnchainKit's
@@ -191,7 +170,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     }
 
     const parsedAmount = parseUnits(amount, vaultToken.decimals);
-    const feeAmount = computeFee(parsedAmount);
+    const feeAmount = computeFee(parsedAmount, discounted);
     const netDepositAmount = parsedAmount - feeAmount;
 
     // Official OnchainKit helper — builds the approve + deposit calls for the vault.
@@ -214,7 +193,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     };
 
     return feeAmount > 0n ? [...depositCalls, feeCall] : depositCalls;
-  }, [address, amount, vaultToken, vaultAddress, walletBalance, clearPendingWatchers, locale]);
+  }, [address, amount, vaultToken, vaultAddress, walletBalance, clearPendingWatchers, locale, discounted]);
 
   const handleStatus = useCallback((status: any) => {
     if (PENDING_STATUS_NAMES.has(status?.statusName)) {
@@ -260,7 +239,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
   const feeAmountPreview =
     amount && parseFloat(amount) > 0
-      ? formatUnits(computeFee(parseUnits(amount, vaultToken.decimals)), vaultToken.decimals)
+      ? formatUnits(computeFee(parseUnits(amount, vaultToken.decimals), discounted), vaultToken.decimals)
       : "0";
 
   return (
@@ -297,6 +276,11 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       </p>
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem", fontVariantNumeric: "tabular-nums" }}>
         {t("platformFee", { fee: feeAmountPreview, symbol: vaultToken.symbol })}
+        {discounted && (
+          <span style={{ color: "#4ade80", fontWeight: 700, marginLeft: "0.4rem" }}>
+            · {t("referralDiscountApplied")}
+          </span>
+        )}
       </p>
 
       {isProcessing && !successMessage && !errorMessage && (

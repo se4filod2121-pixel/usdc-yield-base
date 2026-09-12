@@ -6,6 +6,9 @@ import dynamic from "next/dynamic";
 import { base } from "viem/chains";
 import { useBasename } from "../lib/useBasename";
 import { useLocale } from "../lib/LocaleContext";
+import { useReferral } from "../lib/useReferral";
+import { usePortfolio } from "../lib/usePortfolio";
+import { loadHistory } from "../lib/txHistory";
 
 const EarnProvider = dynamic(
   () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnProvider })),
@@ -26,7 +29,10 @@ const VAULTS = [
 type VaultAddress = (typeof VAULTS)[number]["address"];
 type ApyMap = Record<VaultAddress, number | null>;
 type TvlMap = Record<VaultAddress, number | null>;
+type VaultMeta = { creator: string | null; timelockSec: number | null; feeRatio: number | null };
+type VaultMetaMap = Record<VaultAddress, VaultMeta>;
 const MAX_RETRIES = 3;
+const VAULT_ADDRESSES = VAULTS.map((v) => v.address) as VaultAddress[];
 
 function formatUsdCompact(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -42,24 +48,31 @@ const card: React.CSSProperties = {
   overflow: "hidden",
 };
 
-async function fetchVaultInfo(address: string): Promise<{ apy: number | null; tvlUsd: number | null }> {
+async function fetchVaultInfo(address: string): Promise<{ apy: number | null; tvlUsd: number | null; creator: string | null; timelockSec: number | null; feeRatio: number | null }> {
   try {
     const res = await fetch("/morpho-api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ variables: { address } }),
     });
-    if (!res.ok) return { apy: null, tvlUsd: null };
+    if (!res.ok) return { apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null };
     const json = await res.json();
-    const state = json?.data?.vaultByAddress?.state;
+    const vault = json?.data?.vaultByAddress;
+    const state = vault?.state;
     const netApy: number | undefined = state?.netApy;
     const totalAssetsUsd: number | undefined = state?.totalAssetsUsd;
+    const creatorAddress: string | undefined = vault?.creatorAddress;
+    const timelock: number | undefined = state?.timelock;
+    const fee: number | undefined = state?.fee;
     return {
       apy: typeof netApy === "number" ? netApy : null,
       tvlUsd: typeof totalAssetsUsd === "number" ? totalAssetsUsd : null,
+      creator: typeof creatorAddress === "string" ? creatorAddress : null,
+      timelockSec: typeof timelock === "number" ? timelock : null,
+      feeRatio: typeof fee === "number" ? fee : null,
     };
   } catch {
-    return { apy: null, tvlUsd: null };
+    return { apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null };
   }
 }
 
@@ -379,6 +392,155 @@ function AppIcon() {
   );
 }
 
+function VaultDetails({ meta }: { meta: VaultMeta }) {
+  const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  if (!meta.creator && meta.timelockSec == null && meta.feeRatio == null) return null;
+
+  return (
+    <div style={{ borderTop: "1px solid var(--border)" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
+        padding: "0.625rem 1.125rem", background: "transparent", border: "none", cursor: "pointer",
+        fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)",
+      }}>
+        {t("vaultInfoToggle")}
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{ padding: "0 1.125rem 0.875rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {meta.creator && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+              <span style={{ color: "var(--muted)" }}>{t("vaultCurator")}</span>
+              <a href={`https://basescan.org/address/${meta.creator}`} target="_blank" rel="noopener noreferrer"
+                style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}>
+                {meta.creator.slice(0, 6)}...{meta.creator.slice(-4)}
+              </a>
+            </div>
+          )}
+          {meta.timelockSec != null && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+              <span style={{ color: "var(--muted)" }}>{t("vaultTimelock")}</span>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>{Math.round(meta.timelockSec / 86400)}d</span>
+            </div>
+          )}
+          {meta.feeRatio != null && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+              <span style={{ color: "var(--muted)" }}>{t("vaultProtocolFee")}</span>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>{(meta.feeRatio * 100).toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PortfolioSummary({ address }: { address: `0x${string}` }) {
+  const { t } = useLocale();
+  const { totalAssets, activeVaultCount } = usePortfolio(address, VAULT_ADDRESSES);
+
+  return (
+    <div style={{ ...card, padding: "1.125rem", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+      <h2 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.01em", margin: 0, textTransform: "uppercase" }}>
+        {t("portfolioHeading")}
+      </h2>
+      {totalAssets == null ? (
+        <div style={{ height: "1.5rem", width: "60%", borderRadius: 4, background: "rgba(255,255,255,0.06)" }} />
+      ) : totalAssets > 0 ? (
+        <p style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text)", margin: 0, fontVariantNumeric: "tabular-nums" }}>
+          {t("portfolioValue", { amount: totalAssets.toLocaleString(undefined, { maximumFractionDigits: 2 }), count: activeVaultCount })}
+        </p>
+      ) : (
+        <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: 0 }}>{t("portfolioEmpty")}</p>
+      )}
+    </div>
+  );
+}
+
+function ReferralBlock({ address }: { address: `0x${string}` }) {
+  const { t } = useLocale();
+  const { referralCount, referralLink } = useReferral(address);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!referralLink) return;
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — not critical
+    }
+  }, [referralLink]);
+
+  return (
+    <div style={{ ...card, padding: "1.125rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+      <div>
+        <h2 style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text)", margin: "0 0 0.25rem" }}>
+          {t("referralShareTitle")}
+        </h2>
+        <p style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
+          {t("referralShareBody")}
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <input readOnly value={referralLink ?? ""} onFocus={(e) => e.currentTarget.select()} style={{
+          flex: 1, minWidth: 0, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)",
+          borderRadius: "0.625rem", padding: "0.5rem 0.75rem", fontSize: "0.75rem", color: "var(--muted)",
+        }} />
+        <button onClick={handleCopy} disabled={!referralLink} style={{
+          flexShrink: 0, background: "var(--accent)", color: "#fff", border: "none",
+          borderRadius: "0.625rem", padding: "0.5rem 0.875rem", fontSize: "0.78rem", fontWeight: 700,
+          cursor: referralLink ? "pointer" : "default", whiteSpace: "nowrap",
+        }}>
+          {copied ? t("referralLinkCopied") : t("referralCopyLink")}
+        </button>
+      </div>
+      {referralCount > 0 && (
+        <p style={{ fontSize: "0.72rem", color: "#4ade80", margin: 0 }}>
+          {t("referralCountLabel", { count: referralCount })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const REMINDER_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
+
+function DepositReminder() {
+  const { t } = useLocale();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const history = loadHistory();
+    if (history.length === 0) return;
+    const mostRecent = history[0].timestamp;
+    if (Date.now() - mostRecent >= REMINDER_THRESHOLD_MS) setVisible(true);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      ...card, padding: "0.875rem 1.125rem", display: "flex", alignItems: "center",
+      justifyContent: "space-between", gap: "0.75rem",
+      background: "rgba(251,146,60,0.08)", borderColor: "rgba(251,146,60,0.25)",
+    }}>
+      <p style={{ fontSize: "0.8125rem", color: "var(--text)", lineHeight: 1.5, margin: 0 }}>
+        {t("reminderBannerText")}
+      </p>
+      <button onClick={() => setVisible(false)} aria-label={t("reminderDismiss")} style={{
+        flexShrink: 0, background: "transparent", border: "none", color: "var(--muted)",
+        cursor: "pointer", fontSize: "1rem", padding: "0.25rem",
+      }}>✕</button>
+    </div>
+  );
+}
+
 export default function Home() {
   const { t } = useLocale();
   const { address, isConnected } = useAccount();
@@ -393,6 +555,10 @@ export default function Home() {
   const [selectedVault, setSelectedVault] = useState<VaultAddress>(VAULTS[0].address);
   const [apys, setApys] = useState<ApyMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as ApyMap);
   const [tvls, setTvls] = useState<TvlMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as TvlMap);
+  const emptyVaultMeta: VaultMeta = { creator: null, timelockSec: null, feeRatio: null };
+  const [vaultInfos, setVaultInfos] = useState<VaultMetaMap>({
+    [VAULTS[0].address]: emptyVaultMeta, [VAULTS[1].address]: emptyVaultMeta, [VAULTS[2].address]: emptyVaultMeta,
+  } as VaultMetaMap);
   const [earnKey, setEarnKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
@@ -409,6 +575,11 @@ export default function Home() {
         setTvls((prev) => {
           const next = { ...prev };
           for (const r of results) next[r.address] = r.tvlUsd;
+          return next;
+        });
+        setVaultInfos((prev) => {
+          const next = { ...prev };
+          for (const r of results) next[r.address] = { creator: r.creator, timelockSec: r.timelockSec, feeRatio: r.feeRatio };
           return next;
         });
       });
@@ -489,6 +660,14 @@ export default function Home() {
           )}
         </div>
 
+        {isConnected && address && (
+          <>
+            <DepositReminder />
+            <PortfolioSummary address={address} />
+            <ReferralBlock address={address} />
+          </>
+        )}
+
         <div style={card}>
           <div style={{ padding: "1.125rem 1.125rem 0.875rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.25rem" }}>
@@ -513,6 +692,7 @@ export default function Home() {
 
           <div style={{ borderBottom: "1px solid var(--border)" }}>
             <VaultPicker selected={selectedVault} apys={apys} tvls={tvls} onSelect={handleVaultSelect} />
+            <VaultDetails meta={vaultInfos[selectedVault]} />
           </div>
 
           {showNetworkOverlay ? (
