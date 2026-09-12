@@ -5,6 +5,7 @@ import { useAccount, useChainId, useSwitchChain, useConnect, useDisconnect } fro
 import dynamic from "next/dynamic";
 import { base } from "viem/chains";
 import { useBasename } from "../lib/useBasename";
+import { useLocale } from "../lib/LocaleContext";
 
 const EarnProvider = dynamic(
   () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnProvider })),
@@ -120,6 +121,7 @@ function ConnectorIcon({ connector }: { connector: Connector }) {
 }
 
 function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: () => void }) {
+  const { t } = useLocale();
   const { connect, connectors, isPending, variables, error } = useConnect();
   const sheetRef = useRef<HTMLDivElement>(null);
   const hasInjectedProvider = typeof window !== "undefined" && !!(window as any).ethereum;
@@ -158,9 +160,9 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
           <h2 id="wc-modal-title" style={{ fontSize: "1.0625rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
-            Connect Wallet
+            {t("connectWalletTitle")}
           </h2>
-          <button onClick={onClose} aria-label="Close" style={{
+          <button onClick={onClose} aria-label={t("close")} style={{
             background: "rgba(255,255,255,0.07)", border: "none", borderRadius: "50%",
             width: 32, height: 32, cursor: "pointer", color: "var(--muted)",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem",
@@ -181,10 +183,10 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)" }}>{connector.name}</div>
                 <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.1rem" }}>
-                  {connector.id === "coinbaseWalletSDK" && "Smart Wallet · Coinbase extension"}
-                  {connector.id === "walletConnect" && "Scan QR with Trust, Rainbow & more"}
-                  {connector.type === "injected" && connector.id !== "injected" && "Browser extension"}
-                  {connector.id === "injected" && "Browser extension"}
+                  {connector.id === "coinbaseWalletSDK" && t("connectorCoinbaseDesc")}
+                  {connector.id === "walletConnect" && t("connectorWalletConnectDesc")}
+                  {connector.type === "injected" && connector.id !== "injected" && t("connectorBrowserDesc")}
+                  {connector.id === "injected" && t("connectorBrowserDesc")}
                 </div>
               </div>
               {isThis ? (
@@ -204,7 +206,7 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
 
         {error && (
           <p style={{ fontSize: "0.8125rem", color: "#f87171", textAlign: "center", margin: "0.5rem 0 0", lineHeight: 1.5 }}>
-            {error.message.includes("rejected") ? "Connection cancelled." : error.message}
+            {error.message.includes("rejected") ? t("connectionCancelled") : error.message}
           </p>
         )}
       </div>
@@ -213,13 +215,14 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
 }
 
 function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddress; apys: ApyMap; tvls: TvlMap; onSelect: (a: VaultAddress) => void }) {
+  const { t } = useLocale();
   const best = Object.entries(apys).reduce<{ addr: string | null; v: number }>((acc, [addr, v]) => {
     if (v != null && v > acc.v) return { addr, v };
     return acc;
   }, { addr: null, v: -Infinity }).addr;
 
   return (
-    <div role="listbox" aria-label="Select vault" style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.875rem 0.875rem 0.75rem" }}>
+    <div role="listbox" aria-label={t("selectVaultAria")} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.875rem 0.875rem 0.75rem" }}>
       {VAULTS.map((vault) => {
         const isSelected = vault.address === selected;
         const isBest = vault.address === best;
@@ -250,7 +253,7 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
                       color: "#4ade80", background: "rgba(74,222,128,0.12)",
                       border: "1px solid rgba(74,222,128,0.3)", borderRadius: "999px",
                       padding: "0.05rem 0.4rem", textTransform: "uppercase",
-                    }}>Best</span>
+                    }}>{t("best")}</span>
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.25rem" }}>
@@ -264,7 +267,7 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
                   </span>
                   {tvl != null && (
                     <span style={{ fontSize: "0.68rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-                      {formatUsdCompact(tvl)} TVL
+                      {formatUsdCompact(tvl)} {t("tvlSuffix")}
                     </span>
                   )}
                 </div>
@@ -291,6 +294,7 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
 }
 
 function WrongNetworkOverlay({ onSwitch, isPending }: { onSwitch: () => void; isPending: boolean }) {
+  const { t } = useLocale();
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", padding: "2rem 1.25rem", textAlign: "center" }}>
       <div style={{ width: "3rem", height: "3rem", borderRadius: "50%", background: "rgba(251,146,60,0.12)", border: "1.5px solid rgba(251,146,60,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -299,9 +303,9 @@ function WrongNetworkOverlay({ onSwitch, isPending }: { onSwitch: () => void; is
         </svg>
       </div>
       <div>
-        <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", margin: "0 0 0.375rem" }}>Wrong Network</p>
+        <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", margin: "0 0 0.375rem" }}>{t("wrongNetworkTitle")}</p>
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.55, margin: 0, maxWidth: "17rem" }}>
-          Deposits are only available on <strong style={{ color: "var(--text)" }}>Base mainnet</strong>. Switch your wallet to continue.
+          {t("wrongNetworkBody", { network: t("baseMainnetLabel") })}
         </p>
       </div>
       <button onClick={onSwitch} disabled={isPending} style={{
@@ -313,14 +317,15 @@ function WrongNetworkOverlay({ onSwitch, isPending }: { onSwitch: () => void; is
         display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
       }}>
         {isPending ? (
-          <><span style={{ display: "inline-block", width: "0.875rem", height: "0.875rem", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.7s linear infinite" }} />Switching…</>
-        ) : "Switch to Base"}
+          <><span style={{ display: "inline-block", width: "0.875rem", height: "0.875rem", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.7s linear infinite" }} />{t("switching")}</>
+        ) : t("switchToBase")}
       </button>
     </div>
   );
 }
 
 function IdentityHeader({ address, isOnBase }: { address: `0x${string}`; isOnBase: boolean }) {
+  const { t } = useLocale();
   const { basename, avatar } = useBasename(address);
   const displayName = basename ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
 
@@ -346,7 +351,7 @@ function IdentityHeader({ address, isOnBase }: { address: `0x${string}`; isOnBas
           {displayName}
         </span>
         <p style={{ fontSize: "0.72rem", color: "var(--muted)", margin: 0 }}>
-          {isOnBase ? "Base mainnet" : "Wrong network"}
+          {isOnBase ? t("baseMainnetLabel") : t("wrongNetworkLabel")}
         </p>
       </div>
     </div>
@@ -375,6 +380,7 @@ function AppIcon() {
 }
 
 export default function Home() {
+  const { t } = useLocale();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
@@ -457,7 +463,7 @@ export default function Home() {
             USDC Yield on Base
           </h1>
           <p style={{ fontSize: "0.875rem", color: "var(--muted)", lineHeight: 1.6, maxWidth: "19rem", margin: 0 }}>
-            Connect your wallet and pick a vault to start earning.
+            {t("appTagline")}
           </p>
         </div>
 
@@ -470,7 +476,7 @@ export default function Home() {
                 borderRadius: "0.625rem", padding: "0.4rem 0.875rem",
                 fontSize: "0.8125rem", fontWeight: 600, color: "var(--muted)",
                 cursor: "pointer", whiteSpace: "nowrap",
-              }}>Disconnect</button>
+              }}>{t("disconnect")}</button>
             </div>
           ) : (
             <button onClick={() => setWalletModalOpen(true)} style={{
@@ -479,7 +485,7 @@ export default function Home() {
               fontSize: "0.9375rem", fontWeight: 700, cursor: "pointer",
               width: "100%", letterSpacing: "-0.01em",
               boxShadow: "0 4px 18px rgba(23,184,214,0.35)",
-            }}>Connect Wallet</button>
+            }}>{t("connectWalletTitle")}</button>
           )}
         </div>
 
@@ -487,7 +493,7 @@ export default function Home() {
           <div style={{ padding: "1.125rem 1.125rem 0.875rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.25rem" }}>
               <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", margin: 0 }}>
-                Earn yield on your USDC
+                {t("earnHeading")}
               </h2>
               {totalTvlUsd != null && (
                 <span style={{
@@ -496,12 +502,12 @@ export default function Home() {
                   borderRadius: "999px", padding: "0.2rem 0.625rem", whiteSpace: "nowrap",
                   fontVariantNumeric: "tabular-nums",
                 }}>
-                  {formatUsdCompact(totalTvlUsd)} TVL
+                  {formatUsdCompact(totalTvlUsd)} {t("tvlSuffix")}
                 </span>
               )}
             </div>
             <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
-              Choose a Morpho vault on Base and deposit USDC to earn yield.
+              {t("earnSubtitle")}
             </p>
           </div>
 
@@ -514,22 +520,22 @@ export default function Home() {
           ) : permanentError ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", padding: "1.5rem 1.125rem", textAlign: "center" }}>
               <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: 0 }}>
-                Could not load vault data for {selectedMeta.name}. Tap Retry to reload.
+                {t("vaultLoadError", { name: selectedMeta.name })}
               </p>
               <button onClick={handleManualRetry} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: "0.625rem", padding: "0.625rem 1.5rem", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", width: "100%", maxWidth: "12rem" }}>
-                Retry
+                {t("retry")}
               </button>
             </div>
           ) : (
             <>
               <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
-                {(["deposit", "withdraw"] as const).map((t) => (
-                  <button key={t} onClick={() => setDepositTab(t)} style={{
+                {(["deposit", "withdraw"] as const).map((tabKey) => (
+                  <button key={tabKey} onClick={() => setDepositTab(tabKey)} style={{
                     flex: 1, padding: "0.875rem 0", border: "none", cursor: "pointer",
-                    background: depositTab === t ? "var(--accent)" : "transparent",
-                    color: depositTab === t ? "#fff" : "var(--muted)",
-                    fontWeight: 700, fontSize: "0.9375rem", textTransform: "capitalize",
-                  }}>{t}</button>
+                    background: depositTab === tabKey ? "var(--accent)" : "transparent",
+                    color: depositTab === tabKey ? "#fff" : "var(--muted)",
+                    fontWeight: 700, fontSize: "0.9375rem",
+                  }}>{tabKey === "deposit" ? t("tabDeposit") : t("tabWithdraw")}</button>
                 ))}
               </div>
               {depositTab === "deposit" ? (
@@ -547,9 +553,9 @@ export default function Home() {
 
         <footer style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem 0", textAlign: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem", color: "var(--muted)" }}>
-            <span>Built on Base</span>
+            <span>{t("builtOnBase")}</span>
             <span aria-hidden="true">·</span>
-            <span>Powered by Morpho</span>
+            <span>{t("poweredByMorpho")}</span>
             <span aria-hidden="true">·</span>
             <a
               href={`https://basescan.org/address/${selectedVault}`}
@@ -557,11 +563,11 @@ export default function Home() {
               rel="noopener noreferrer"
               style={{ color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}
             >
-              View vault on Basescan
+              {t("viewOnBasescan")}
             </a>
           </div>
           <p style={{ fontSize: "0.7rem", color: "var(--muted)", opacity: 0.7, maxWidth: "22rem", margin: 0, lineHeight: 1.5 }}>
-            Not financial advice. Depositing into a Morpho vault carries smart-contract risk. Do your own research.
+            {t("disclaimer")}
           </p>
         </footer>
       </main>

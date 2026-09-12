@@ -10,6 +10,7 @@ import {
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
 import { computeFee } from "../lib/fee";
 import { formatCompactNumber } from "../lib/format";
+import { useLocale } from "../lib/LocaleContext";
 import {
   friendlyError,
   localizedMessage,
@@ -45,6 +46,7 @@ function saveHistoryEntry(entry: HistoryEntry) {
 }
 
 export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+  const { locale, t } = useLocale();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { vaultToken, apy, deposits, liquidity, walletBalance } = useEarnContext();
@@ -99,7 +101,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       const entry: HistoryEntry = { hash, amount: ctx.amount, symbol: ctx.symbol, timestamp: Date.now() };
       saveHistoryEntry(entry);
       setHistory(loadHistory());
-      setSuccessMessage(`${ctx.amount} ${ctx.symbol} başarıyla yatırıldı.`);
+      setSuccessMessage(t("depositSuccess", { amount: ctx.amount, symbol: ctx.symbol }));
 
       const parsedAmount = parseUnits(ctx.amount, ctx.decimals);
       const feeAmount = computeFee(parsedAmount);
@@ -121,7 +123,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
       setAmount("");
     },
-    [clearPendingWatchers]
+    [clearPendingWatchers, t]
   );
 
   // Fallback for when the wallet has confirmed the batch but OnchainKit's
@@ -184,7 +186,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     if (!address || !vaultToken || !amount || parseFloat(amount) <= 0) return [];
 
     if (walletBalance != null && parseFloat(amount) > parseFloat(walletBalance)) {
-      setErrorMessage(friendlyError("insufficient balance"));
+      setErrorMessage(friendlyError(locale, "insufficient balance"));
       return [];
     }
 
@@ -212,7 +214,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     };
 
     return feeAmount > 0n ? [...depositCalls, feeCall] : depositCalls;
-  }, [address, amount, vaultToken, vaultAddress, walletBalance, clearPendingWatchers]);
+  }, [address, amount, vaultToken, vaultAddress, walletBalance, clearPendingWatchers, locale]);
 
   const handleStatus = useCallback((status: any) => {
     if (PENDING_STATUS_NAMES.has(status?.statusName)) {
@@ -221,7 +223,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         pendingTimerRef.current = setTimeout(() => {
           pendingTimerRef.current = null;
           if (!settledRef.current) {
-            setErrorMessage(localizedMessage("timeout"));
+            setErrorMessage(localizedMessage(locale, "timeout"));
             setShowRetry(true);
           }
         }, PENDING_TIMEOUT_MS);
@@ -236,7 +238,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       clearPendingWatchers();
       setIsProcessing(false);
       const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
-      setErrorMessage(friendlyError(String(raw)));
+      setErrorMessage(friendlyError(locale, String(raw)));
       setShowRetry(false);
     }
     if (status?.statusName === "success" && vaultToken && address) {
@@ -252,7 +254,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         });
       }
     }
-  }, [amount, vaultToken, address, vaultAddress, clearPendingWatchers, startFallbackPoll, finalizeSuccess]);
+  }, [amount, vaultToken, address, vaultAddress, clearPendingWatchers, startFallbackPoll, finalizeSuccess, locale]);
 
   if (!vaultToken) return null;
 
@@ -268,7 +270,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/usdc.svg" alt="" width={22} height={22} style={{ borderRadius: "50%", flexShrink: 0 }} />
           <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
-            Deposit {vaultToken.symbol}
+            {t("depositHeader", { symbol: vaultToken.symbol })}
           </span>
         </div>
         <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
@@ -291,16 +293,16 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       />
 
       <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "0 0 0.25rem", fontVariantNumeric: "tabular-nums" }}>
-        Wallet balance: <span style={{ color: "var(--text)", fontWeight: 600 }}>{walletBalance ?? "—"} {vaultToken.symbol}</span>
+        {t("walletBalanceLabel")} <span style={{ color: "var(--text)", fontWeight: 600 }}>{walletBalance ?? "—"} {vaultToken.symbol}</span>
       </p>
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0 0 1rem", fontVariantNumeric: "tabular-nums" }}>
-        Includes a 0.1% platform fee ({feeAmountPreview} {vaultToken.symbol})
+        {t("platformFee", { fee: feeAmountPreview, symbol: vaultToken.symbol })}
       </p>
 
       {isProcessing && !successMessage && !errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0 0 0.75rem", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <span style={{ width: "0.875rem", height: "0.875rem", flexShrink: 0, borderRadius: "50%", border: "2px solid rgba(23,184,214,0.25)", borderTopColor: "var(--accent)", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
-          İşleminiz cüzdanınızda onaylanıyor ve zincire yazılıyor — bu birkaç saniyeden bir dakikaya kadar sürebilir.
+          {t("processingMessage")}
         </p>
       )}
 
@@ -327,22 +329,26 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
             color: "var(--text)", marginBottom: "0.75rem", cursor: "pointer",
           }}
         >
-          Yeni bir işlem başlat
+          {t("startNewTransaction")}
         </button>
       )}
 
       <Transaction key={transactionKey} calls={buildCalls} onStatus={handleStatus}>
-        <TransactionButton text="Deposit" className="tx-button" />
+        <TransactionButton text={t("tabDeposit")} className="tx-button" />
       </Transaction>
 
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0.75rem 0 0", fontVariantNumeric: "tabular-nums" }}>
-        Vault: {deposits ? formatCompactNumber(deposits) : "—"} {vaultToken.symbol} total deposits · {liquidity ? formatCompactNumber(liquidity) : "—"} liquidity
+        {t("vaultTotals", {
+          deposits: deposits ? formatCompactNumber(deposits) : "—",
+          symbol: vaultToken.symbol,
+          liquidity: liquidity ? formatCompactNumber(liquidity) : "—",
+        })}
       </p>
 
       {history.length > 0 && (
         <div style={{ marginTop: "1.25rem", borderTop: "1px solid var(--border)", paddingTop: "0.875rem" }}>
           <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", margin: "0 0 0.5rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Son İşlemler
+            {t("recentTransactions")}
           </p>
           {history.map((h) => (
             <a
@@ -356,7 +362,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
                 fontSize: "0.8125rem", borderBottom: "1px solid rgba(255,255,255,0.04)",
               }}
             >
-              <span>{h.amount} {h.symbol} yatırıldı</span>
+              <span>{t("depositedLine", { amount: h.amount, symbol: h.symbol })}</span>
               <span style={{ color: "#6e9eff", fontSize: "0.75rem" }}>BaseScan ↗</span>
             </a>
           ))}
