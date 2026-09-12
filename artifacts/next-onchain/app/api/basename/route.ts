@@ -7,13 +7,31 @@ import {
   isAddress,
   keccak256,
   namehash,
+  zeroAddress,
+  type Address,
 } from "viem";
 
-// See lib/useBasename.ts for why this is queried directly instead of
-// relying on the version of @coinbase/onchainkit pinned in this app (it
-// hardcodes an old, since-migrated-away-from resolver address).
-const BASENAME_RESOLVER = "0x426fA03fB86E510d0Dd9F70335Cf102a98b10875" as const;
+// The Basenames Registry is the source of truth for which resolver
+// contract currently holds a given node's records. We used to hardcode
+// a single resolver address for both lookups below, but the registry
+// points the *reverse* node (address -> name) and the *forward* node
+// (name -> avatar) at two different resolver contracts for at least
+// some accounts (Base has migrated resolvers over time, and reverse
+// records don't get moved when a name's forward resolver changes).
+// Querying the registry per-node avoids ever hardcoding a resolver
+// address again.
+const BASENAMES_REGISTRY = "0xB94704422c2a1E396835A571837Aa5AE53285a95" as const;
 const BASE_CHAIN_ID = 8453;
+
+const registryAbi = [
+  {
+    type: "function",
+    name: "resolver",
+    stateMutability: "view",
+    inputs: [{ name: "node", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
 
 const resolverAbi = [
   {
@@ -49,12 +67,22 @@ const publicClient = createPublicClient({
   transport: http(),
 });
 
-function reverseNode(address: `0x${string}`): `0x${string}` {
+function reverseNode(address: Address): `0x${string}` {
   const addressFormatted = address.toLowerCase() as `0x${string}`;
   const addressNode = keccak256(addressFormatted.substring(2) as `0x${string}`);
   const coinType = ((0x80000000 | BASE_CHAIN_ID) >>> 0).toString(16).toUpperCase();
   const baseReverseNode = namehash(`${coinType}.reverse`);
   return keccak256(encodePacked(["bytes32", "bytes32"], [baseReverseNode, addressNode]));
+}
+
+async function resolverFor(node: `0x${string}`): Promise<Address | null> {
+  const resolver = await publicClient.readContract({
+    address: BASENAMES_REGISTRY,
+    abi: registryAbi,
+    functionName: "resolver",
+    args: [node],
+  });
+  return resolver === zeroAddress ? null : resolver;
 }
 
 // Resolving Basenames client-side (a raw fetch to a public RPC URL) can be
@@ -72,25 +100,37 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const rNode = reverseNode(address);
+    const reverseResolver = await resolverFor(rNode);
+    if (!reverseResolver) {
+      return NextResponse.json({ basename: null, avatar: null });
+    }
+
     const basename = await publicClient.readContract({
-      address: BASENAME_RESOLVER,
+      address: reverseResolver,
       abi: resolverAbi,
       functionName: "name",
-      args: [reverseNode(address)],
+      args: [rNode],
     });
 
     if (!basename) {
       return NextResponse.json({ basename: null, avatar: null });
     }
 
-    const avatar = await publicClient.readContract({
-      address: BASENAME_RESOLVER,
-      abi: resolverAbi,
-      functionName: "text",
-      args: [namehash(basename), "avatar"],
-    });
+    const fNode = namehash(basename);
+    const forwardResolver = await resolverFor(fNode);
+    let avatar: string | null = null;
+    if (forwardResolver) {
+      const text = await publicClient.readContract({
+        address: forwardResolver,
+        abi: resolverAbi,
+        functionName: "text",
+        args: [fNode, "avatar"],
+      });
+      avatar = text || null;
+    }
 
-    return NextResponse.json({ basename, avatar: avatar || null });
+    return NextResponse.json({ basename, avatar });
   } catch (err) {
     console.error("[api/basename] resolution error:", err);
     return NextResponse.json({ basename: null, avatar: null });
