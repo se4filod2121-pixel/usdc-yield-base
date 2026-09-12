@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "../../lib/rateLimit";
 
 const MORPHO_GRAPHQL = "https://blue-api.morpho.org/graphql";
 
@@ -45,6 +46,9 @@ const CORRECTED_QUERY = `query($address: String!) {
 }`;
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, { limit: 60, windowMs: 60_000, routeName: "morpho-api-post" });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const variables = body?.variables ?? {};

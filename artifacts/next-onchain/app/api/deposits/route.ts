@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, depositsTable, insertDepositSchema } from "@workspace/db";
-import { desc, sql } from "drizzle-orm";
 import { computeFee } from "../../../lib/fee";
+import { rateLimit } from "../../../lib/rateLimit";
 import {
   createPublicClient,
   defineChain,
@@ -100,6 +100,9 @@ async function verifyDepositOnChain(params: {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, { limit: 10, windowMs: 60_000, routeName: "deposits-post" });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
 
@@ -172,43 +175,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, deposit: inserted ?? null });
   } catch (err) {
     console.error("[api/deposits] POST error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
-}
-
-export async function GET(req: NextRequest) {
-  try {
-    const wallet = req.nextUrl.searchParams.get("wallet");
-
-    if (wallet) {
-      const rows = await db
-        .select()
-        .from(depositsTable)
-        .where(sql`${depositsTable.walletAddress} = ${wallet}`)
-        .orderBy(desc(depositsTable.createdAt))
-        .limit(50);
-
-      return NextResponse.json({ deposits: rows });
-    }
-
-    const [summary] = await db
-      .select({
-        totalDeposited: sql<string>`coalesce(sum(${depositsTable.amount}), 0)`,
-        totalFees: sql<string>`coalesce(sum(${depositsTable.feeAmount}), 0)`,
-        uniqueUsers: sql<number>`count(distinct ${depositsTable.walletAddress})`,
-        totalTx: sql<number>`count(*)`,
-      })
-      .from(depositsTable);
-
-    const recent = await db
-      .select()
-      .from(depositsTable)
-      .orderBy(desc(depositsTable.createdAt))
-      .limit(20);
-
-    return NextResponse.json({ summary, recent });
-  } catch (err) {
-    console.error("[api/deposits] GET error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
