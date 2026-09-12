@@ -3,7 +3,7 @@ import { rateLimit } from "../../lib/rateLimit";
 
 const MORPHO_GRAPHQL = "https://blue-api.morpho.org/graphql";
 
-const CORRECTED_QUERY = `query($address: String!) {
+const CORRECTED_QUERY = `query($address: String!, $historyOptions: TimeseriesOptions) {
   vaultByAddress(address: $address, chainId: 8453) {
     address
     symbol
@@ -42,8 +42,24 @@ const CORRECTED_QUERY = `query($address: String!) {
         }
       }
     }
+    historicalState {
+      netApy(options: $historyOptions) {
+        x
+        y
+      }
+    }
   }
 }`;
+
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
+
+// Callers that don't care about the history chart (e.g. the vault picker's
+// APY/TVL poll) can just ignore the extra field rather than needing a
+// second query shape — so the proxy always fills in a sane default range.
+function defaultHistoryOptions() {
+  const now = Math.floor(Date.now() / 1000);
+  return { startTimestamp: now - THIRTY_DAYS_SECONDS, endTimestamp: now, interval: "DAY" };
+}
 
 export async function POST(req: NextRequest) {
   const limited = rateLimit(req, { limit: 60, windowMs: 60_000, routeName: "morpho-api-post" });
@@ -51,7 +67,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const variables = body?.variables ?? {};
+    const variables = {
+      historyOptions: defaultHistoryOptions(),
+      ...(body?.variables ?? {}),
+    };
 
     const upstream = await fetch(MORPHO_GRAPHQL, {
       method: "POST",

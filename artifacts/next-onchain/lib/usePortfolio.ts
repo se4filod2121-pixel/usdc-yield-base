@@ -4,11 +4,6 @@ import { useEffect, useState } from "react";
 import { usePublicClient } from "wagmi";
 import { formatUnits, type Address } from "viem";
 
-// Every vault this app lists is a USDC (6-decimal) ERC-4626 vault, so a
-// fixed decimals count is safe here rather than needing per-vault token
-// metadata just to render a portfolio total.
-const USDC_DECIMALS = 6;
-
 const vaultAbi = [
   {
     type: "function",
@@ -26,26 +21,31 @@ const vaultAbi = [
   },
 ] as const;
 
+export type PortfolioVaultSpec = { address: Address; decimals: number };
+
 // Reads the connected wallet's live, current position directly from each
-// vault contract (shares -> underlying USDC value) rather than summing our
+// vault contract (shares -> underlying asset value) rather than summing our
 // own deposits log — the log has no record of withdrawals, so a simple sum
 // of past deposits would overstate the real position. This is always the
 // true current value, independent of anything our backend has recorded.
-export function usePortfolio(address: Address | undefined, vaultAddresses: readonly Address[]) {
+//
+// Returns one amount per vault rather than a single blended total: this app
+// lists vaults over more than one underlying asset (USDC, WETH, ...), and
+// summing raw amounts across different assets/decimals would produce a
+// meaningless number. Callers that want a total must first group by asset.
+export function usePortfolio(address: Address | undefined, vaults: readonly PortfolioVaultSpec[]) {
   const publicClient = usePublicClient();
-  const [totalAssets, setTotalAssets] = useState<number | null>(null);
-  const [activeVaultCount, setActiveVaultCount] = useState(0);
+  const [perVaultAssets, setPerVaultAssets] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     if (!address || !publicClient) {
-      setTotalAssets(null);
-      setActiveVaultCount(0);
+      setPerVaultAssets(null);
       return;
     }
     let cancelled = false;
 
     Promise.all(
-      vaultAddresses.map(async (vaultAddress) => {
+      vaults.map(async ({ address: vaultAddress, decimals }) => {
         try {
           const shares = await publicClient.readContract({
             address: vaultAddress,
@@ -53,28 +53,27 @@ export function usePortfolio(address: Address | undefined, vaultAddresses: reado
             functionName: "balanceOf",
             args: [address],
           });
-          if (shares === 0n) return 0;
+          if (shares === 0n) return [vaultAddress, 0] as const;
           const assets = await publicClient.readContract({
             address: vaultAddress,
             abi: vaultAbi,
             functionName: "convertToAssets",
             args: [shares],
           });
-          return Number(formatUnits(assets, USDC_DECIMALS));
+          return [vaultAddress, Number(formatUnits(assets, decimals))] as const;
         } catch {
-          return 0;
+          return [vaultAddress, 0] as const;
         }
       })
-    ).then((amounts) => {
+    ).then((entries) => {
       if (cancelled) return;
-      setTotalAssets(amounts.reduce((a, b) => a + b, 0));
-      setActiveVaultCount(amounts.filter((a) => a > 0).length);
+      setPerVaultAssets(Object.fromEntries(entries));
     });
 
     return () => {
       cancelled = true;
     };
-  }, [address, publicClient, vaultAddresses]);
+  }, [address, publicClient, vaults]);
 
-  return { totalAssets, activeVaultCount };
+  return { perVaultAssets };
 }

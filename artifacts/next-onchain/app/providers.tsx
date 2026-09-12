@@ -233,7 +233,16 @@ export function Providers({ children, initialLocale }: { children: ReactNode; in
           <OnchainKitProvider
             apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
             chain={base}
-            config={{ appearance: { mode: "dark", theme: "base" } }}
+            config={{
+              appearance: { mode: "dark", theme: "base" },
+              // Points OnchainKit's sponsorship plumbing at our own /api/paymaster
+              // relay only when a funded paymaster is actually configured server
+              // side — see CustomDepositPanel's isSponsored prop for the other
+              // half of this flag. Left off by default so a misconfigured or
+              // unfunded paymaster can never turn a real deposit's batched call
+              // into a hard failure.
+              paymaster: process.env.NEXT_PUBLIC_PAYMASTER_ENABLED === "true" ? "/api/paymaster" : undefined,
+            }}
           >
             <ErrorDebugPatch />
             <ErrorReportPatch />

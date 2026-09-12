@@ -317,7 +317,12 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         </button>
       )}
 
-      <Transaction key={transactionKey} calls={buildCalls} onStatus={handleStatus}>
+      <Transaction
+        key={transactionKey}
+        calls={buildCalls}
+        onStatus={handleStatus}
+        isSponsored={process.env.NEXT_PUBLIC_PAYMASTER_ENABLED === "true"}
+      >
         <TransactionButton text={t("tabDeposit")} className="tx-button" />
       </Transaction>
 
