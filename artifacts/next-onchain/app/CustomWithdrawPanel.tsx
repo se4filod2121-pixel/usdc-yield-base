@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, usePublicClient } from "wagmi";
-import { erc20Abi } from "viem";
+import { erc20Abi, formatUnits } from "viem";
 import {
   useEarnContext,
   WithdrawAmountInput,
-  WithdrawBalance,
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
 import {
@@ -16,6 +15,22 @@ import {
   PENDING_STATUS_NAMES,
 } from "../lib/transactionStatus";
 
+// ERC-4626 maxWithdraw — the vault's own idle/available liquidity may be
+// lower than what the user has deposited (funds lent out elsewhere), in
+// which case a withdraw for the full deposited balance reverts on-chain
+// even though the UI shows a healthy balance. We check this ourselves
+// because OnchainKit's own "Use max" sets the full deposited balance
+// regardless of what the vault can actually pay out right now.
+const maxWithdrawAbi = [
+  {
+    type: "function",
+    name: "maxWithdraw",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
 export function CustomWithdrawPanel() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -23,12 +38,34 @@ export function CustomWithdrawPanel() {
     vaultAddress,
     vaultToken,
     apy,
+    depositedBalance,
     withdrawAmount,
     setWithdrawAmount,
     withdrawCalls,
     withdrawAmountError,
     refetchDepositedBalance,
   } = useEarnContext();
+
+  const [maxWithdrawable, setMaxWithdrawable] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!publicClient || !address || !vaultAddress || !vaultToken) {
+      setMaxWithdrawable(null);
+      return;
+    }
+    let cancelled = false;
+    publicClient
+      .readContract({ address: vaultAddress, abi: maxWithdrawAbi, functionName: "maxWithdraw", args: [address] })
+      .then((raw) => {
+        if (!cancelled) setMaxWithdrawable(formatUnits(raw, vaultToken.decimals));
+      })
+      .catch(() => {
+        if (!cancelled) setMaxWithdrawable(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, address, vaultAddress, vaultToken, depositedBalance]);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -163,6 +200,17 @@ export function CustomWithdrawPanel() {
 
   if (!vaultToken) return null;
 
+  const depositedNum = depositedBalance ? parseFloat(depositedBalance) : 0;
+  const maxWithdrawableNum = maxWithdrawable != null ? parseFloat(maxWithdrawable) : null;
+  // What the vault can actually pay out right now, capped by both what the
+  // user owns and the vault's real available liquidity.
+  const cappedMax =
+    maxWithdrawableNum != null ? Math.min(depositedNum, maxWithdrawableNum) : depositedNum;
+  const liquidityLimited =
+    maxWithdrawableNum != null && maxWithdrawableNum < depositedNum - 1e-9;
+  const exceedsLiquidity =
+    maxWithdrawableNum != null && !!withdrawAmount && parseFloat(withdrawAmount) > maxWithdrawableNum;
+
   return (
     <div style={{ padding: "1.125rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
@@ -178,7 +226,34 @@ export function CustomWithdrawPanel() {
         </span>
       </div>
       <WithdrawAmountInput />
-      <WithdrawBalance />
+
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)",
+        borderRadius: "0.875rem", padding: "0.75rem 1rem", marginTop: "0.5rem",
+      }}>
+        <div>
+          <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)" }}>
+            {cappedMax.toFixed(4)} {vaultToken.symbol}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Available to withdraw</div>
+        </div>
+        {cappedMax > 0 && (
+          <button
+            type="button"
+            onClick={() => setWithdrawAmount(String(cappedMax))}
+            style={{ background: "none", border: "none", color: "#6e9eff", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer" }}
+          >
+            Use max
+          </button>
+        )}
+      </div>
+
+      {liquidityLimited && (
+        <p style={{ fontSize: "0.75rem", color: "#fb923c", margin: "0.5rem 0 0", lineHeight: 1.5 }}>
+          Vault şu anda anlık çekim için sınırlı likiditeye sahip — şu an en fazla {maxWithdrawableNum?.toFixed(4)} {vaultToken.symbol} çekebilirsiniz. Kalan bakiyeniz için daha sonra tekrar deneyin.
+        </p>
+      )}
 
       {isProcessing && !successMessage && !errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0.75rem 0 0", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -217,8 +292,8 @@ export function CustomWithdrawPanel() {
       <div style={{ marginTop: "0.75rem" }}>
         <Transaction key={transactionKey} calls={withdrawCalls} onStatus={handleStatus}>
           <TransactionButton
-            text={withdrawAmountError ?? "Withdraw"}
-            disabled={!!withdrawAmountError || !withdrawAmount}
+            text={withdrawAmountError ?? (exceedsLiquidity ? "Yetersiz likidite" : "Withdraw")}
+            disabled={!!withdrawAmountError || !withdrawAmount || exceedsLiquidity}
             className="tx-button"
           />
         </Transaction>
