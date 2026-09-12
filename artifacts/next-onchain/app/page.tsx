@@ -253,31 +253,34 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
                     }}>Best</span>
                   )}
                 </div>
-                <span style={{
-                  display: "inline-block", marginTop: "0.2rem",
-                  fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-                  padding: "0.1rem 0.5rem", borderRadius: "999px",
-                  background: "rgba(255,255,255,0.06)", color: "var(--muted)",
-                }}>
-                  {vault.tag}
-                </span>
-                {tvl != null && (
-                  <span style={{ fontSize: "0.68rem", color: "var(--muted)", marginLeft: "0.5rem" }}>
-                    {formatUsdCompact(tvl)} TVL
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.25rem" }}>
+                  <span style={{
+                    display: "inline-block",
+                    fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                    padding: "0.1rem 0.5rem", borderRadius: "999px",
+                    background: "rgba(255,255,255,0.06)", color: "var(--muted)",
+                  }}>
+                    {vault.tag}
                   </span>
-                )}
+                  {tvl != null && (
+                    <span style={{ fontSize: "0.68rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {formatUsdCompact(tvl)} TVL
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div style={{
               flexShrink: 0,
-              background: isSelected ? "rgba(0,82,255,0.18)" : "rgba(255,255,255,0.06)",
-              color: isSelected ? "#6e9eff" : "var(--muted)",
+              background: "rgba(74,222,128,0.12)",
+              border: "1px solid rgba(74,222,128,0.25)",
+              color: "#4ade80",
               borderRadius: "999px", padding: "0.2rem 0.625rem",
               fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.01em",
               minWidth: "4.75rem", textAlign: "center", fontVariantNumeric: "tabular-nums",
             }}>
               {apy === null ? (
-                <span style={{ display: "inline-block", width: "3rem", height: "0.75em", borderRadius: 4, background: "rgba(255,255,255,0.08)", verticalAlign: "middle" }} />
+                <span style={{ display: "inline-block", width: "3rem", height: "0.75em", borderRadius: 4, background: "rgba(74,222,128,0.15)", verticalAlign: "middle" }} />
               ) : `APY ${apyLabel}`}
             </div>
           </button>
@@ -460,9 +463,10 @@ export default function Home() {
               </h2>
               {totalTvlUsd != null && (
                 <span style={{
-                  fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)",
-                  background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)",
+                  fontSize: "0.7rem", fontWeight: 700, color: "var(--text)",
+                  background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)",
                   borderRadius: "999px", padding: "0.2rem 0.625rem", whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
                 }}>
                   {formatUsdCompact(totalTvlUsd)} TVL
                 </span>
