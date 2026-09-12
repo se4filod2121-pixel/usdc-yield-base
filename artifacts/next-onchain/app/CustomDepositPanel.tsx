@@ -110,11 +110,13 @@ function friendlyError(raw: string): string {
   return localizedMessage(key);
 }
 
-// If the wallet never answers the sendCalls/paymaster request (e.g. a
-// paymaster misconfiguration, or the wallet app losing the handoff), the
-// OnchainKit <Transaction> component has no built-in timeout and its button
-// spins forever. Remounting it (via `key`) after a timeout clears that
-// stuck internal state so the user can retry.
+// The OnchainKit <Transaction> component has no built-in timeout, so on a
+// slow wallet round-trip its button just spins forever with no feedback.
+// After this long we tell the user it's taking a while — but we do NOT
+// remount the component: a real confirmation can still arrive well past
+// this mark (mobile wallet hand-offs are slow), and remounting would tear
+// down the listener and silently drop that success. Remounting only
+// happens if the user explicitly asks to retry.
 const PENDING_TIMEOUT_MS = 40_000;
 const PENDING_STATUS_NAMES = new Set([
   "buildingTransaction",
@@ -129,7 +131,18 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [transactionKey, setTransactionKey] = useState(0);
+  const [showRetry, setShowRetry] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetTransaction = useCallback(() => {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setShowRetry(false);
+    setErrorMessage(null);
+    setTransactionKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -179,7 +192,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         pendingTimerRef.current = setTimeout(() => {
           pendingTimerRef.current = null;
           setErrorMessage(localizedMessage("timeout"));
-          setTransactionKey((k) => k + 1);
+          setShowRetry(true);
         }, PENDING_TIMEOUT_MS);
       }
     } else if (pendingTimerRef.current) {
@@ -190,8 +203,10 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
     if (status?.statusName === "error") {
       const raw = status?.statusData?.message || status?.statusData?.error?.message || "";
       setErrorMessage(friendlyError(String(raw)));
+      setShowRetry(false);
     }
     if (status?.statusName === "success") {
+      setShowRetry(false);
       const hash = status?.statusData?.transactionReceipts?.[0]?.transactionHash;
       if (hash && vaultToken && address) {
         const entry: HistoryEntry = {
@@ -248,7 +263,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         inputMode="decimal"
         placeholder="0.0"
         value={amount}
-        onChange={(e) => { setAmount(e.target.value); setErrorMessage(null); }}
+        onChange={(e) => { setAmount(e.target.value); setErrorMessage(null); setShowRetry(false); }}
         style={{
           width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
           border: "1.5px solid var(--border)", borderRadius: "0.875rem",
@@ -268,6 +283,21 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         <p style={{ fontSize: "0.8125rem", color: "#f87171", margin: "0 0 0.75rem", lineHeight: 1.5 }}>
           {errorMessage}
         </p>
+      )}
+
+      {showRetry && (
+        <button
+          type="button"
+          onClick={resetTransaction}
+          style={{
+            width: "100%", boxSizing: "border-box", background: "transparent",
+            border: "1.5px solid var(--border)", borderRadius: "0.875rem",
+            padding: "0.625rem 1rem", fontSize: "0.8125rem", fontWeight: 600,
+            color: "var(--text)", marginBottom: "0.75rem", cursor: "pointer",
+          }}
+        >
+          Yeni bir işlem başlat
+        </button>
       )}
 
       <Transaction key={transactionKey} calls={buildCalls} onStatus={handleStatus}>
