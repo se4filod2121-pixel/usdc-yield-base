@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount, useChainId, useSwitchChain, useConnect, useDisconnect } from "wagmi";
-import { Avatar, Name } from "@coinbase/onchainkit/identity";
 import dynamic from "next/dynamic";
 import { base } from "viem/chains";
+import { useBasename } from "../lib/useBasename";
 
 const EarnProvider = dynamic(
   () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnProvider })),
@@ -320,6 +320,39 @@ function WrongNetworkOverlay({ onSwitch, isPending }: { onSwitch: () => void; is
   );
 }
 
+function IdentityHeader({ address, isOnBase }: { address: `0x${string}`; isOnBase: boolean }) {
+  const { basename, avatar } = useBasename(address);
+  const displayName = basename ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0, flex: 1 }}>
+      <div style={{
+        width: "2.25rem", height: "2.25rem", borderRadius: "50%", flexShrink: 0,
+        overflow: "hidden", background: "rgba(255,255,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt="" width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ color: "var(--muted)" }}>
+            <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.75" />
+            <path d="M4 20c0-3.5 3.5-6 8-6s8 2.5 8 6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+          </svg>
+        )}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {displayName}
+        </span>
+        <p style={{ fontSize: "0.72rem", color: "var(--muted)", margin: 0 }}>
+          {isOnBase ? "Base mainnet" : "Wrong network"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AppIcon() {
   return (
     <div style={{
@@ -426,17 +459,7 @@ export default function Home() {
         <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", padding: "1.25rem", gap: "0.75rem" }}>
           {isConnected && address ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "0.75rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0 }}>
-                <Avatar address={address} chain={base} className="h-9 w-9" />
-                <div style={{ minWidth: 0 }}>
-                  <Name address={address} chain={base} style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span slot="loading">{`${address.slice(0, 6)}...${address.slice(-4)}`}</span>
-                  </Name>
-                  <p style={{ fontSize: "0.72rem", color: "var(--muted)", margin: 0 }}>
-                    {isOnBase ? "Base mainnet" : "Wrong network"}
-                  </p>
-                </div>
-              </div>
+              <IdentityHeader address={address} isOnBase={isOnBase} />
               <button onClick={() => disconnect()} style={{
                 flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1.5px solid var(--border)",
                 borderRadius: "0.625rem", padding: "0.4rem 0.875rem",
