@@ -6,27 +6,13 @@ import { Avatar, Name } from "@coinbase/onchainkit/identity";
 import dynamic from "next/dynamic";
 import { base } from "viem/chains";
 
-const Earn = dynamic(
-  () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.Earn })),
-  {
-    ssr: false,
-    loading: () => (
-      <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: "var(--muted)", fontSize: "0.875rem" }}>
-        Loading vault…
-      </div>
-    ),
-  }
-);
-const EarnWithdraw = dynamic(
-  () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnWithdraw })),
-  { ssr: false }
-);
 const EarnProvider = dynamic(
   () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnProvider })),
   { ssr: false }
 );
 import type { Connector } from "wagmi";
 import { CustomDepositPanel } from "./CustomDepositPanel";
+import { CustomWithdrawPanel } from "./CustomWithdrawPanel";
 
 const USDC_LOGO =
   "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/assets/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913/logo.png";
@@ -483,9 +469,9 @@ export default function Home() {
                   <CustomDepositPanel vaultAddress={selectedVault} />
                 </EarnProvider>
               ) : (
-                <Earn key={earnKey} vaultAddress={selectedVault} onError={handleEarnError}>
-                  <EarnWithdraw />
-                </Earn>
+                <EarnProvider key={earnKey} vaultAddress={selectedVault} onError={handleEarnError}>
+                  <CustomWithdrawPanel />
+                </EarnProvider>
               )}
             </>
           )}
