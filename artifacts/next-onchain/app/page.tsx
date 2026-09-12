@@ -21,18 +21,24 @@ import { CustomWithdrawPanel } from "./CustomWithdrawPanel";
 const USDC_LOGO = "/usdc.svg";
 
 const VAULTS = [
-  { address: "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A" as `0x${string}`, name: "Spark USDC", tag: "Spark" },
-  { address: "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738" as `0x${string}`, name: "Seamless USDC", tag: "Seamless" },
-  { address: "0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183" as `0x${string}`, name: "Steakhouse USDC", tag: "Steakhouse" },
+  { address: "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A" as `0x${string}`, name: "Spark USDC", tag: "Spark", curatorUrl: "https://spark.fi", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
+  { address: "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738" as `0x${string}`, name: "Seamless USDC", tag: "Seamless", curatorUrl: "https://seamlessprotocol.com", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
+  { address: "0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183" as `0x${string}`, name: "Steakhouse USDC", tag: "Steakhouse", curatorUrl: "https://www.steakhouse.financial", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
+  // First non-USDC vault: verified on-chain (asset() returns Base's canonical
+  // WETH address, real bytecode, non-trivial totalAssets) before being added
+  // here — see the session notes on why that verification matters before
+  // trusting a contract address with real deposits.
+  { address: "0x27D8c7273fd3fcC6956a0B370cE5Fd4A7fc65c18" as `0x${string}`, name: "Seamless WETH Vault", tag: "Seamless", curatorUrl: "https://seamlessprotocol.com", assetSymbol: "WETH", assetDecimals: 18, logo: undefined },
 ] as const;
 
 type VaultAddress = (typeof VAULTS)[number]["address"];
 type ApyMap = Record<VaultAddress, number | null>;
 type TvlMap = Record<VaultAddress, number | null>;
-type VaultMeta = { creator: string | null; timelockSec: number | null; feeRatio: number | null };
+type VaultMeta = { creator: string | null; timelockSec: number | null; feeRatio: number | null; apyHistory: number[] | null };
 type VaultMetaMap = Record<VaultAddress, VaultMeta>;
 const MAX_RETRIES = 3;
 const VAULT_ADDRESSES = VAULTS.map((v) => v.address) as VaultAddress[];
+const PORTFOLIO_VAULT_SPECS = VAULTS.map((v) => ({ address: v.address, decimals: v.assetDecimals }));
 
 function formatUsdCompact(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -48,14 +54,27 @@ const card: React.CSSProperties = {
   overflow: "hidden",
 };
 
-async function fetchVaultInfo(address: string): Promise<{ apy: number | null; tvlUsd: number | null; creator: string | null; timelockSec: number | null; feeRatio: number | null }> {
+type VaultInfoResult = {
+  apy: number | null;
+  tvlUsd: number | null;
+  creator: string | null;
+  timelockSec: number | null;
+  feeRatio: number | null;
+  apyHistory: number[] | null;
+};
+
+const EMPTY_VAULT_INFO: VaultInfoResult = {
+  apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null, apyHistory: null,
+};
+
+async function fetchVaultInfo(address: string): Promise<VaultInfoResult> {
   try {
     const res = await fetch("/morpho-api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ variables: { address } }),
     });
-    if (!res.ok) return { apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null };
+    if (!res.ok) return EMPTY_VAULT_INFO;
     const json = await res.json();
     const vault = json?.data?.vaultByAddress;
     const state = vault?.state;
@@ -64,37 +83,44 @@ async function fetchVaultInfo(address: string): Promise<{ apy: number | null; tv
     const creatorAddress: string | undefined = vault?.creatorAddress;
     const timelock: number | undefined = state?.timelock;
     const fee: number | undefined = state?.fee;
+    const historyPoints: Array<{ x: number; y: number }> | undefined = vault?.historicalState?.netApy;
     return {
       apy: typeof netApy === "number" ? netApy : null,
       tvlUsd: typeof totalAssetsUsd === "number" ? totalAssetsUsd : null,
       creator: typeof creatorAddress === "string" ? creatorAddress : null,
       timelockSec: typeof timelock === "number" ? timelock : null,
       feeRatio: typeof fee === "number" ? fee : null,
+      apyHistory: Array.isArray(historyPoints) && historyPoints.length >= 2
+        ? historyPoints.map((p) => p.y)
+        : null,
     };
   } catch {
-    return { apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null };
+    return EMPTY_VAULT_INFO;
   }
 }
 
 function TokenLogo({ symbol, src, size = 34 }: { symbol: string; src?: string; size?: number }) {
-  const [stage, setStage] = useState<0 | 1 | 2>(0);
+  // No fallback to the USDC icon for a missing/broken src — this app now
+  // lists vaults over more than one asset, so an image failure (or no icon
+  // asset at all for a given token) falls straight to a neutral initials
+  // badge instead of silently mislabeling e.g. a WETH vault with the USDC logo.
+  const [failed, setFailed] = useState(!src);
   const circle: React.CSSProperties = {
     width: size, height: size, borderRadius: "50%",
     flexShrink: 0, display: "flex", alignItems: "center",
     justifyContent: "center", overflow: "hidden",
   };
-  if (stage === 2) {
+  if (failed || !src) {
     return (
       <div style={{ ...circle, background: "linear-gradient(135deg,#2775CA,#1a5fa8)", fontSize: size * 0.28, fontWeight: 800, color: "#fff", letterSpacing: "0.02em" }} aria-label={symbol}>
         {symbol}
       </div>
     );
   }
-  const currentSrc = stage === 0 ? (src || USDC_LOGO) : USDC_LOGO;
   return (
     <div style={circle}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={currentSrc} alt={symbol} width={size} height={size} style={{ width: size, height: size, objectFit: "cover" }} onError={() => setStage((s) => (s === 0 ? 1 : 2))} />
+      <img src={src} alt={symbol} width={size} height={size} style={{ width: size, height: size, objectFit: "cover" }} onError={() => setFailed(true)} />
     </div>
   );
 }
@@ -254,7 +280,7 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
               transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", minWidth: 0, flex: 1 }}>
-              <TokenLogo symbol="USDC" src={USDC_LOGO} />
+              <TokenLogo symbol={vault.assetSymbol} src={vault.logo} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
                   <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -392,7 +418,26 @@ function AppIcon() {
   );
 }
 
-function VaultDetails({ meta }: { meta: VaultMeta }) {
+function ApySparkline({ points }: { points: number[] }) {
+  const width = 120;
+  const height = 32;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const step = width / (points.length - 1);
+  const path = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(height - ((p - min) / range) * height).toFixed(1)}`)
+    .join(" ");
+  const trendingUp = points[points.length - 1] >= points[0];
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <path d={path} fill="none" stroke={trendingUp ? "#4ade80" : "#f87171"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function VaultDetails({ meta, curatorUrl }: { meta: VaultMeta; curatorUrl: string }) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   if (!meta.creator && meta.timelockSec == null && meta.feeRatio == null) return null;
@@ -412,6 +457,11 @@ function VaultDetails({ meta }: { meta: VaultMeta }) {
       </button>
       {open && (
         <div style={{ padding: "0 1.125rem 0.875rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {meta.apyHistory && (
+            <div style={{ display: "flex", justifyContent: "center", padding: "0.25rem 0 0.4rem" }}>
+              <ApySparkline points={meta.apyHistory} />
+            </div>
+          )}
           {meta.creator && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
               <span style={{ color: "var(--muted)" }}>{t("vaultCurator")}</span>
@@ -421,6 +471,13 @@ function VaultDetails({ meta }: { meta: VaultMeta }) {
               </a>
             </div>
           )}
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+            <span style={{ color: "var(--muted)" }}>{t("vaultCuratorSite")}</span>
+            <a href={curatorUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}>
+              {curatorUrl.replace(/^https?:\/\//, "")}
+            </a>
+          </div>
           {meta.timelockSec != null && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
               <span style={{ color: "var(--muted)" }}>{t("vaultTimelock")}</span>
@@ -439,21 +496,91 @@ function VaultDetails({ meta }: { meta: VaultMeta }) {
   );
 }
 
+const REBALANCE_THRESHOLD = 0.005; // 0.5 percentage points of APY
+
+// A pure suggestion, never an automatic transfer: it just points the vault
+// picker at the better-yielding vault so the user can withdraw from their
+// current one and deposit into the new one themselves, each its own signed
+// transaction. Moving a user's funds without their explicit per-transaction
+// confirmation is a trust line we deliberately don't cross.
+function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void }) {
+  const { t } = useLocale();
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+
+  if (!perVaultAssets) return null;
+
+  // Only ever compares a held vault against other vaults of the SAME
+  // underlying asset — a WETH vault's APY isn't a substitute for a USDC
+  // vault's, so cross-asset "better yield" comparisons would be misleading,
+  // not helpful.
+  for (const held of VAULTS) {
+    const heldAmount = perVaultAssets[held.address];
+    const heldApy = apys[held.address];
+    if (!heldAmount || heldAmount <= 0 || heldApy == null) continue;
+
+    const better = VAULTS
+      .filter((v) => v.assetSymbol === held.assetSymbol && v.address !== held.address)
+      .reduce<{ address: VaultAddress; name: string; apy: number } | null>((best, v) => {
+        const apy = apys[v.address];
+        if (apy == null) return best;
+        if (!best || apy > best.apy) return { address: v.address, name: v.name, apy };
+        return best;
+      }, null);
+
+    if (better && better.apy - heldApy >= REBALANCE_THRESHOLD) {
+      return (
+        <div style={{
+          ...card, padding: "1rem 1.125rem", display: "flex", alignItems: "center",
+          justifyContent: "space-between", gap: "0.75rem",
+          background: "rgba(74,222,128,0.06)", borderColor: "rgba(74,222,128,0.25)",
+        }}>
+          <p style={{ fontSize: "0.8125rem", color: "var(--text)", lineHeight: 1.5, margin: 0 }}>
+            {t("rebalanceSuggestionText", { vault: better.name, apy: `${(better.apy * 100).toFixed(2)}%` })}
+          </p>
+          <button onClick={() => onSwitchVault(better.address)} style={{
+            flexShrink: 0, background: "var(--accent)", color: "#fff", border: "none",
+            borderRadius: "0.625rem", padding: "0.5rem 0.875rem", fontSize: "0.78rem", fontWeight: 700,
+            cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            {t("rebalanceSuggestionCta")}
+          </button>
+        </div>
+      );
+    }
+  }
+
+  return null;
+}
+
 function PortfolioSummary({ address }: { address: `0x${string}` }) {
   const { t } = useLocale();
-  const { totalAssets, activeVaultCount } = usePortfolio(address, VAULT_ADDRESSES);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+
+  const groups = perVaultAssets
+    ? Array.from(
+        VAULTS.reduce((map, v) => {
+          const amount = perVaultAssets[v.address];
+          if (!amount || amount <= 0) return map;
+          const prev = map.get(v.assetSymbol) ?? { total: 0, count: 0 };
+          map.set(v.assetSymbol, { total: prev.total + amount, count: prev.count + 1 });
+          return map;
+        }, new Map<string, { total: number; count: number }>())
+      )
+    : null;
 
   return (
     <div style={{ ...card, padding: "1.125rem", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
       <h2 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.01em", margin: 0, textTransform: "uppercase" }}>
         {t("portfolioHeading")}
       </h2>
-      {totalAssets == null ? (
+      {groups == null ? (
         <div style={{ height: "1.5rem", width: "60%", borderRadius: 4, background: "rgba(255,255,255,0.06)" }} />
-      ) : totalAssets > 0 ? (
-        <p style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text)", margin: 0, fontVariantNumeric: "tabular-nums" }}>
-          {t("portfolioValue", { amount: totalAssets.toLocaleString(undefined, { maximumFractionDigits: 2 }), count: activeVaultCount })}
-        </p>
+      ) : groups.length > 0 ? (
+        groups.map(([symbol, { total, count }]) => (
+          <p key={symbol} style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text)", margin: 0, fontVariantNumeric: "tabular-nums" }}>
+            {t("portfolioValue", { amount: total.toLocaleString(undefined, { maximumFractionDigits: 4 }), count, symbol })}
+          </p>
+        ))
       ) : (
         <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: 0 }}>{t("portfolioEmpty")}</p>
       )}
@@ -509,6 +636,128 @@ function ReferralBlock({ address }: { address: `0x${string}` }) {
   );
 }
 
+function ReferralLeaderboard() {
+  const { t } = useLocale();
+  const [entries, setEntries] = useState<{ referrerAddress: string; count: number }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/referral/leaderboard")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setEntries(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+      })
+      .catch(() => {
+        if (!cancelled) setEntries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (entries != null && entries.length === 0) return null;
+
+  return (
+    <div style={{ ...card, padding: "1.125rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+      <h2 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.01em", margin: 0, textTransform: "uppercase" }}>
+        {t("referralLeaderboardHeading")}
+      </h2>
+      {entries == null ? (
+        <div style={{ height: "1.25rem", width: "70%", borderRadius: 4, background: "rgba(255,255,255,0.06)" }} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {entries.map((entry, i) => (
+            <div key={entry.referrerAddress} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.78rem" }}>
+              <span style={{ color: "var(--muted)" }}>
+                #{i + 1} {entry.referrerAddress.slice(0, 6)}...{entry.referrerAddress.slice(-4)}
+              </span>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                {t("referralLeaderboardEntry", { count: entry.count })}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function NotificationSubscribe() {
+  const { t } = useLocale();
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "done" | "invalid" | "error">("idle");
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!EMAIL_RE.test(email)) {
+        setStatus("invalid");
+        return;
+      }
+      setStatus("submitting");
+      try {
+        const res = await fetch("/api/notifications/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        setStatus(res.ok ? "done" : "error");
+      } catch {
+        setStatus("error");
+      }
+    },
+    [email]
+  );
+
+  if (status === "done") {
+    return (
+      <div style={{ ...card, padding: "1.125rem" }}>
+        <p style={{ fontSize: "0.8125rem", color: "#4ade80", margin: 0, fontWeight: 600 }}>
+          {t("notificationsSubscribed")}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...card, padding: "1.125rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+      <div>
+        <h2 style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text)", margin: "0 0 0.25rem" }}>
+          {t("notificationsHeading")}
+        </h2>
+        <p style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
+          {t("notificationsBody")}
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "0.5rem" }}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
+          placeholder={t("notificationsEmailPlaceholder")}
+          style={{
+            flex: 1, minWidth: 0, background: "rgba(255,255,255,0.05)",
+            border: `1px solid ${status === "invalid" ? "#f87171" : "var(--border)"}`,
+            borderRadius: "0.625rem", padding: "0.5rem 0.75rem", fontSize: "0.8125rem", color: "var(--text)",
+          }}
+        />
+        <button type="submit" disabled={status === "submitting"} style={{
+          flexShrink: 0, background: "var(--accent)", color: "#fff", border: "none",
+          borderRadius: "0.625rem", padding: "0.5rem 0.875rem", fontSize: "0.78rem", fontWeight: 700,
+          cursor: status === "submitting" ? "default" : "pointer", whiteSpace: "nowrap",
+        }}>
+          {t("notificationsSubscribe")}
+        </button>
+      </form>
+      {status === "invalid" && (
+        <p style={{ fontSize: "0.72rem", color: "#f87171", margin: 0 }}>{t("notificationsInvalidEmail")}</p>
+      )}
+    </div>
+  );
+}
+
 const REMINDER_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
 
 function DepositReminder() {
@@ -553,12 +802,16 @@ export default function Home() {
   const closeModal = useCallback(() => setWalletModalOpen(false), []);
 
   const [selectedVault, setSelectedVault] = useState<VaultAddress>(VAULTS[0].address);
-  const [apys, setApys] = useState<ApyMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as ApyMap);
-  const [tvls, setTvls] = useState<TvlMap>({ [VAULTS[0].address]: null, [VAULTS[1].address]: null, [VAULTS[2].address]: null } as TvlMap);
-  const emptyVaultMeta: VaultMeta = { creator: null, timelockSec: null, feeRatio: null };
-  const [vaultInfos, setVaultInfos] = useState<VaultMetaMap>({
-    [VAULTS[0].address]: emptyVaultMeta, [VAULTS[1].address]: emptyVaultMeta, [VAULTS[2].address]: emptyVaultMeta,
-  } as VaultMetaMap);
+  const [apys, setApys] = useState<ApyMap>(
+    () => Object.fromEntries(VAULT_ADDRESSES.map((a) => [a, null])) as ApyMap
+  );
+  const [tvls, setTvls] = useState<TvlMap>(
+    () => Object.fromEntries(VAULT_ADDRESSES.map((a) => [a, null])) as TvlMap
+  );
+  const emptyVaultMeta: VaultMeta = { creator: null, timelockSec: null, feeRatio: null, apyHistory: null };
+  const [vaultInfos, setVaultInfos] = useState<VaultMetaMap>(
+    () => Object.fromEntries(VAULT_ADDRESSES.map((a) => [a, emptyVaultMeta])) as VaultMetaMap
+  );
   const [earnKey, setEarnKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
@@ -579,7 +832,7 @@ export default function Home() {
         });
         setVaultInfos((prev) => {
           const next = { ...prev };
-          for (const r of results) next[r.address] = { creator: r.creator, timelockSec: r.timelockSec, feeRatio: r.feeRatio };
+          for (const r of results) next[r.address] = { creator: r.creator, timelockSec: r.timelockSec, feeRatio: r.feeRatio, apyHistory: r.apyHistory };
           return next;
         });
       });
@@ -663,8 +916,10 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder />
+            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} />
             <PortfolioSummary address={address} />
             <ReferralBlock address={address} />
+            <ReferralLeaderboard />
           </>
         )}
 
@@ -692,7 +947,7 @@ export default function Home() {
 
           <div style={{ borderBottom: "1px solid var(--border)" }}>
             <VaultPicker selected={selectedVault} apys={apys} tvls={tvls} onSelect={handleVaultSelect} />
-            <VaultDetails meta={vaultInfos[selectedVault]} />
+            <VaultDetails meta={vaultInfos[selectedVault]} curatorUrl={selectedMeta.curatorUrl} />
           </div>
 
           {showNetworkOverlay ? (
@@ -730,6 +985,8 @@ export default function Home() {
             </>
           )}
         </div>
+
+        <NotificationSubscribe />
 
         <footer style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem 0", textAlign: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.75rem", color: "var(--muted)" }}>
