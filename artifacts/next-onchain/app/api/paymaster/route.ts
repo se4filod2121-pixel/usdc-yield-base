@@ -1,3 +1,6 @@
+import type { NextRequest } from "next/server";
+import { rateLimit } from "../../../lib/rateLimit";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -32,7 +35,10 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, { limit: 30, windowMs: 60_000, routeName: "paymaster-post" });
+  if (limited) return limited;
+
   const url = process.env.PAYMASTER_RPC_URL;
 
   const rawBody = await req.text();

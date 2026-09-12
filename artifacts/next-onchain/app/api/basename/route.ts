@@ -10,6 +10,7 @@ import {
   zeroAddress,
   type Address,
 } from "viem";
+import { rateLimit } from "../../../lib/rateLimit";
 
 // The Basenames Registry is the source of truth for which resolver
 // contract currently holds a given node's records. We used to hardcode
@@ -93,6 +94,9 @@ async function resolverFor(node: `0x${string}`): Promise<Address | null> {
 // that entirely, the same way /api/deposits and /morpho-api already do for
 // their own on-chain/upstream calls.
 export async function GET(req: NextRequest) {
+  const limited = rateLimit(req, { limit: 30, windowMs: 60_000, routeName: "basename-get" });
+  if (limited) return limited;
+
   const address = req.nextUrl.searchParams.get("address");
 
   if (!address || !isAddress(address)) {
