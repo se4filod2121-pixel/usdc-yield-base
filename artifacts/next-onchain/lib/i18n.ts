@@ -92,6 +92,9 @@ const en = {
   showAllVaults: "Show all vaults ({count} inactive)",
   showActiveVaultsOnly: "Show active vaults only",
   vaultInactiveNote: "Not earning right now — no funds currently allocated",
+  socialProofUsers: "{count} users",
+  socialProofDeposited: "{amount} deposited",
+  socialProofAvgApy: "{apy} avg APY",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -170,6 +173,9 @@ const tr: Dict = {
   showAllVaults: "Tüm kasaları göster ({count} pasif)",
   showActiveVaultsOnly: "Sadece aktif kasaları göster",
   vaultInactiveNote: "Şu an aktif getiri üretmiyor (fon tahsis edilmemiş)",
+  socialProofUsers: "{count} kullanıcı",
+  socialProofDeposited: "{amount} toplam deposit",
+  socialProofAvgApy: "ortalama APY {apy}",
 };
 
 const de: Dict = {
@@ -245,6 +251,9 @@ const de: Dict = {
   showAllVaults: "Alle Vaults anzeigen ({count} inaktiv)",
   showActiveVaultsOnly: "Nur aktive Vaults anzeigen",
   vaultInactiveNote: "Erzielt derzeit keine Rendite — keine Mittel zugewiesen",
+  socialProofUsers: "{count} Nutzer",
+  socialProofDeposited: "{amount} eingezahlt",
+  socialProofAvgApy: "{apy} durchschn. APY",
 };
 
 const zh: Dict = {
@@ -320,6 +329,9 @@ const zh: Dict = {
   showAllVaults: "显示所有金库（{count} 个未活跃）",
   showActiveVaultsOnly: "仅显示活跃金库",
   vaultInactiveNote: "目前未产生收益——尚未分配资金",
+  socialProofUsers: "{count} 位用户",
+  socialProofDeposited: "已存入 {amount}",
+  socialProofAvgApy: "平均 APY {apy}",
 };
 
 const es: Dict = {
@@ -395,6 +407,9 @@ const es: Dict = {
   showAllVaults: "Mostrar todas las bóvedas ({count} inactivas)",
   showActiveVaultsOnly: "Mostrar solo bóvedas activas",
   vaultInactiveNote: "No genera rendimiento ahora mismo — sin fondos asignados",
+  socialProofUsers: "{count} usuarios",
+  socialProofDeposited: "{amount} depositados",
+  socialProofAvgApy: "APY medio {apy}",
 };
 
 const fr: Dict = {
@@ -470,6 +485,9 @@ const fr: Dict = {
   showAllVaults: "Afficher tous les coffres ({count} inactifs)",
   showActiveVaultsOnly: "Afficher uniquement les coffres actifs",
   vaultInactiveNote: "Ne génère aucun rendement actuellement — aucun fonds alloué",
+  socialProofUsers: "{count} utilisateurs",
+  socialProofDeposited: "{amount} déposés",
+  socialProofAvgApy: "APY moyen {apy}",
 };
 
 const pt: Dict = {
@@ -545,6 +563,9 @@ const pt: Dict = {
   showAllVaults: "Mostrar todos os cofres ({count} inativos)",
   showActiveVaultsOnly: "Mostrar apenas cofres ativos",
   vaultInactiveNote: "Não está rendendo no momento — sem fundos alocados",
+  socialProofUsers: "{count} usuários",
+  socialProofDeposited: "{amount} depositados",
+  socialProofAvgApy: "APY médio {apy}",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };
