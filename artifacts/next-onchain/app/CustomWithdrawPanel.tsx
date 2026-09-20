@@ -210,6 +210,11 @@ export function CustomWithdrawPanel() {
     maxWithdrawableNum != null ? Math.min(depositedNum, maxWithdrawableNum) : depositedNum;
   const liquidityLimited =
     maxWithdrawableNum != null && maxWithdrawableNum < depositedNum - 1e-9;
+  // Checked against the user's own position, distinct from exceedsLiquidity
+  // below (which is about the vault's available liquidity, not what the
+  // user owns) — same "disable + relabel the button" guard as the deposit
+  // panel's insufficient-balance check.
+  const insufficientPosition = !!withdrawAmount && parseFloat(withdrawAmount) > depositedNum;
   const exceedsLiquidity =
     maxWithdrawableNum != null && !!withdrawAmount && parseFloat(withdrawAmount) > maxWithdrawableNum;
 
@@ -294,8 +299,15 @@ export function CustomWithdrawPanel() {
       <div style={{ marginTop: "0.75rem" }}>
         <Transaction key={transactionKey} calls={withdrawCalls} onStatus={handleStatus}>
           <TransactionButton
-            text={withdrawAmountError ?? (exceedsLiquidity ? t("insufficientLiquidity") : t("tabWithdraw"))}
-            disabled={!!withdrawAmountError || !withdrawAmount || exceedsLiquidity}
+            text={
+              withdrawAmountError ??
+              (insufficientPosition
+                ? t("insufficientBalanceButton")
+                : exceedsLiquidity
+                ? t("insufficientLiquidity")
+                : t("tabWithdraw"))
+            }
+            disabled={!!withdrawAmountError || !withdrawAmount || insufficientPosition || exceedsLiquidity}
             className="tx-button"
           />
         </Transaction>
