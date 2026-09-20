@@ -101,6 +101,7 @@ const en = {
   saveAppsLater: "Maybe later",
   vaultAudits: "Audits",
   vaultContinuousYield: "Interest accrues continuously — withdraw anytime, no lock-up.",
+  refreshData: "Refresh",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -188,6 +189,7 @@ const tr: Dict = {
   saveAppsLater: "Daha Sonra",
   vaultAudits: "Denetim",
   vaultContinuousYield: "Faiz sürekli birikir — istediğin an, kilit olmadan çekebilirsin.",
+  refreshData: "Yenile",
 };
 
 const de: Dict = {
@@ -272,6 +274,7 @@ const de: Dict = {
   saveAppsLater: "Vielleicht später",
   vaultAudits: "Audits",
   vaultContinuousYield: "Zinsen fallen laufend an — jederzeit ohne Sperrfrist abhebbar.",
+  refreshData: "Aktualisieren",
 };
 
 const zh: Dict = {
@@ -356,6 +359,7 @@ const zh: Dict = {
   saveAppsLater: "以后再说",
   vaultAudits: "审计",
   vaultContinuousYield: "利息持续累积——随时可提取，无锁定期。",
+  refreshData: "刷新",
 };
 
 const es: Dict = {
@@ -440,6 +444,7 @@ const es: Dict = {
   saveAppsLater: "Más tarde",
   vaultAudits: "Auditorías",
   vaultContinuousYield: "El interés se acumula continuamente — retira cuando quieras, sin bloqueo.",
+  refreshData: "Actualizar",
 };
 
 const fr: Dict = {
@@ -524,6 +529,7 @@ const fr: Dict = {
   saveAppsLater: "Plus tard",
   vaultAudits: "Audits",
   vaultContinuousYield: "Les intérêts s'accumulent en continu — retirez à tout moment, sans blocage.",
+  refreshData: "Actualiser",
 };
 
 const pt: Dict = {
@@ -608,6 +614,7 @@ const pt: Dict = {
   saveAppsLater: "Mais tarde",
   vaultAudits: "Auditorias",
   vaultContinuousYield: "Os juros acumulam continuamente — saque quando quiser, sem bloqueio.",
+  refreshData: "Atualizar",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };
