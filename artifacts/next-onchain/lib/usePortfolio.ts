@@ -33,7 +33,7 @@ export type PortfolioVaultSpec = { address: Address; decimals: number };
 // lists vaults over more than one underlying asset (USDC, WETH, ...), and
 // summing raw amounts across different assets/decimals would produce a
 // meaningless number. Callers that want a total must first group by asset.
-export function usePortfolio(address: Address | undefined, vaults: readonly PortfolioVaultSpec[], refreshKey: number = 0) {
+export function usePortfolio(address: Address | undefined, vaults: readonly PortfolioVaultSpec[]) {
   const publicClient = usePublicClient();
   const [perVaultAssets, setPerVaultAssets] = useState<Record<string, number> | null>(null);
 
@@ -73,7 +73,7 @@ export function usePortfolio(address: Address | undefined, vaults: readonly Port
     return () => {
       cancelled = true;
     };
-  }, [address, publicClient, vaults, refreshKey]);
+  }, [address, publicClient, vaults]);
 
   return { perVaultAssets };
 }

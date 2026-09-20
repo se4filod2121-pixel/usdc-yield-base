@@ -46,29 +46,6 @@ function formatUsdCompact(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-function RefreshButton({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
-  const { t } = useLocale();
-  return (
-    <button
-      onClick={onRefresh}
-      disabled={refreshing}
-      aria-label={t("refreshData")}
-      style={{
-        position: "absolute", top: "0.75rem", right: "1rem",
-        width: "2rem", height: "2rem", borderRadius: "50%", flexShrink: 0,
-        background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        cursor: refreshing ? "default" : "pointer", color: "var(--muted)", padding: 0,
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"
-        style={{ animation: refreshing ? "spin 0.7s linear infinite" : undefined }}>
-        <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.89M13.5 2v3.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </button>
-  );
-}
-
 const card: React.CSSProperties = {
   background: "var(--surface)",
   border: "1px solid var(--border)",
@@ -614,9 +591,9 @@ const REBALANCE_THRESHOLD = 0.005; // 0.5 percentage points of APY
 // current one and deposit into the new one themselves, each its own signed
 // transaction. Moving a user's funds without their explicit per-transaction
 // confirmation is a trust line we deliberately don't cross.
-function RebalanceSuggestion({ address, apys, onSwitchVault, refreshKey }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void; refreshKey: number }) {
+function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
 
   if (!perVaultAssets) return null;
 
@@ -663,9 +640,9 @@ function RebalanceSuggestion({ address, apys, onSwitchVault, refreshKey }: { add
   return null;
 }
 
-function PortfolioSummary({ address, refreshKey }: { address: `0x${string}`; refreshKey: number }) {
+function PortfolioSummary({ address }: { address: `0x${string}` }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
 
   const groups = perVaultAssets
     ? Array.from(
@@ -927,10 +904,9 @@ export default function Home() {
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
   const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
-  const [refreshTick, setRefreshTick] = useState(0);
 
-  const loadVaultData = useCallback(() => {
-    return Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
+  useEffect(() => {
+    Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
       .then((results) => {
         setApys((prev) => {
           const next = { ...prev };
@@ -949,33 +925,6 @@ export default function Home() {
         });
       });
   }, []);
-
-  useEffect(() => {
-    loadVaultData();
-    // Only ever runs the initial load — a pull-to-refresh re-triggers this
-    // directly through handleRefresh instead, without re-running this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [manualRefreshing, setManualRefreshing] = useState(false);
-
-  // Refetches every on-screen data source in place (vault APYs/TVLs/info,
-  // wallet balances via refreshTick, and the deposit/withdraw panel's own
-  // reads via earnKey) without a page reload, so the wallet stays connected.
-  // A plain button rather than a swipe gesture: a window-level touch/pointer
-  // listener risks fighting the browser's own scroll handling (that's
-  // exactly what a pull-to-refresh gesture tried here and broke one-finger
-  // scrolling on real touch devices) — a tap has no such failure mode.
-  const handleRefresh = useCallback(async () => {
-    setManualRefreshing(true);
-    try {
-      await loadVaultData();
-      setEarnKey((k) => k + 1);
-      setRefreshTick((t) => t + 1);
-    } finally {
-      setManualRefreshing(false);
-    }
-  }, [loadVaultData]);
 
   const handleVaultSelect = useCallback((addr: VaultAddress) => {
     setSelectedVault(addr);
@@ -1019,10 +968,7 @@ export default function Home() {
           "radial-gradient(circle at 80% 10%, rgba(23,184,214,0.14), transparent 45%)," +
           "var(--bg)",
         width: "100%", maxWidth: "30rem", marginInline: "auto", boxSizing: "border-box",
-        position: "relative",
       }}>
-        <RefreshButton onRefresh={handleRefresh} refreshing={manualRefreshing} />
-
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.625rem", textAlign: "center", width: "100%" }}>
           <AppIcon />
           <h1 style={{ fontSize: "clamp(1.2rem,5vw,1.625rem)", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)", margin: 0 }}>
@@ -1058,8 +1004,8 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder address={address} />
-            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} refreshKey={refreshTick} />
-            <PortfolioSummary address={address} refreshKey={refreshTick} />
+            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} />
+            <PortfolioSummary address={address} />
             <ReferralBlock address={address} />
             <ReferralLeaderboard />
           </>
