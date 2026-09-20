@@ -463,10 +463,10 @@ function IdentityHeader({ address, isOnBase }: { address: `0x${string}`; isOnBas
   );
 }
 
-function AppIcon() {
+function AppIcon({ size = "3.25rem" }: { size?: string }) {
   return (
     <svg
-      width="3.25rem" height="3.25rem" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+      width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
       style={{ flexShrink: 0, filter: "drop-shadow(0 4px 22px rgba(23,184,214,0.4))" }}
     >
       <defs>
@@ -481,6 +481,30 @@ function AppIcon() {
       <polyline points="10.5,19.5 14,15.5 17,17.7 21,12.5" stroke="white" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="21" cy="12.5" r="2" fill="white" />
     </svg>
+  );
+}
+
+// Shown for the first ~2s after load, over the real page (which renders
+// underneath and continues loading — wallet/vault data isn't held up by
+// this). A plain timed overlay rather than "wait for data" so it never
+// hangs open if a vault fetch is slow, and never flashes bare/unstyled
+// content before disappearing.
+const SPLASH_DURATION_MS = 2000;
+function SplashScreen({ visible }: { visible: boolean }) {
+  return (
+    <div
+      aria-hidden={!visible}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "var(--bg)",
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+        transition: "opacity 0.4s ease",
+      }}
+    >
+      <AppIcon size="5.5rem" />
+    </div>
   );
 }
 
@@ -971,6 +995,13 @@ export default function Home() {
   const [permanentError, setPermanentError] = useState(false);
   const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
   const [refreshTick, setRefreshTick] = useState(0);
+  const earnCardRef = useRef<HTMLDivElement>(null);
+
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), SPLASH_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadVaultData = useCallback(() => {
     return Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
@@ -1043,6 +1074,17 @@ export default function Home() {
     setPermanentError(false);
   }, []);
 
+  // Selecting a vault that's already selected (the common case when the
+  // idle-balance banner points at the default vault) changes no visible
+  // state on its own — from a banner sitting above the fold, that reads as
+  // "the button did nothing". Explicitly switch to the deposit tab and
+  // scroll the earn card into view so the click always has a visible effect.
+  const handleIdleBalanceDeposit = useCallback((addr: VaultAddress) => {
+    handleVaultSelect(addr);
+    setDepositTab("deposit");
+    earnCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [handleVaultSelect]);
+
   const handleEarnError = useCallback((err: { message?: string }) => {
     console.error("[Earn] error:", err);
     if (retryCount < MAX_RETRIES) {
@@ -1068,6 +1110,8 @@ export default function Home() {
   return (
     <>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      <SplashScreen visible={showSplash} />
 
       <main style={{
         minHeight: "100dvh", display: "flex", flexDirection: "column",
@@ -1114,7 +1158,7 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder address={address} />
-            <IdleBalanceBanner address={address} apys={apys} vaultInfos={vaultInfos} onSwitchVault={handleVaultSelect} />
+            <IdleBalanceBanner address={address} apys={apys} vaultInfos={vaultInfos} onSwitchVault={handleIdleBalanceDeposit} />
             <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} refreshKey={refreshTick} />
             <PortfolioSummary address={address} refreshKey={refreshTick} />
             <ReferralBlock address={address} />
@@ -1122,7 +1166,7 @@ export default function Home() {
           </>
         )}
 
-        <div style={card}>
+        <div style={card} ref={earnCardRef}>
           <div style={{ padding: "1.125rem 1.125rem 0.875rem", borderBottom: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.25rem" }}>
               <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em", margin: 0 }}>
