@@ -95,6 +95,10 @@ const en = {
   socialProofUsers: "{count} users",
   socialProofDeposited: "{amount} deposited",
   socialProofAvgApy: "{apy} avg APY",
+  saveAppsTitle: "🎉 Deposit successful!",
+  saveAppsBody: "Add this app to your home screen so you always see the best APY.",
+  saveAppsAdd: "⭐ Add to Home Screen",
+  saveAppsLater: "Maybe later",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -176,6 +180,10 @@ const tr: Dict = {
   socialProofUsers: "{count} kullanıcı",
   socialProofDeposited: "{amount} toplam deposit",
   socialProofAvgApy: "ortalama APY {apy}",
+  saveAppsTitle: "🎉 Deposit başarılı!",
+  saveAppsBody: "Bu uygulamayı ana ekranına eklemek ister misin? Böylece her gün en iyi APY'yi görürsün.",
+  saveAppsAdd: "⭐ Ana Ekrana Ekle",
+  saveAppsLater: "Daha Sonra",
 };
 
 const de: Dict = {
@@ -254,6 +262,10 @@ const de: Dict = {
   socialProofUsers: "{count} Nutzer",
   socialProofDeposited: "{amount} eingezahlt",
   socialProofAvgApy: "{apy} durchschn. APY",
+  saveAppsTitle: "🎉 Einzahlung erfolgreich!",
+  saveAppsBody: "Füge diese App zu deinem Startbildschirm hinzu, um täglich die beste Rendite zu sehen.",
+  saveAppsAdd: "⭐ Zum Startbildschirm hinzufügen",
+  saveAppsLater: "Vielleicht später",
 };
 
 const zh: Dict = {
@@ -332,6 +344,10 @@ const zh: Dict = {
   socialProofUsers: "{count} 位用户",
   socialProofDeposited: "已存入 {amount}",
   socialProofAvgApy: "平均 APY {apy}",
+  saveAppsTitle: "🎉 存款成功！",
+  saveAppsBody: "将此应用添加到主屏幕，随时查看最佳年化收益率。",
+  saveAppsAdd: "⭐ 添加到主屏幕",
+  saveAppsLater: "以后再说",
 };
 
 const es: Dict = {
@@ -410,6 +426,10 @@ const es: Dict = {
   socialProofUsers: "{count} usuarios",
   socialProofDeposited: "{amount} depositados",
   socialProofAvgApy: "APY medio {apy}",
+  saveAppsTitle: "🎉 ¡Depósito exitoso!",
+  saveAppsBody: "Añade esta app a tu pantalla de inicio para ver siempre el mejor APY.",
+  saveAppsAdd: "⭐ Añadir a pantalla de inicio",
+  saveAppsLater: "Más tarde",
 };
 
 const fr: Dict = {
@@ -488,6 +508,10 @@ const fr: Dict = {
   socialProofUsers: "{count} utilisateurs",
   socialProofDeposited: "{amount} déposés",
   socialProofAvgApy: "APY moyen {apy}",
+  saveAppsTitle: "🎉 Dépôt réussi !",
+  saveAppsBody: "Ajoutez cette appli à votre écran d'accueil pour toujours voir le meilleur APY.",
+  saveAppsAdd: "⭐ Ajouter à l'écran d'accueil",
+  saveAppsLater: "Plus tard",
 };
 
 const pt: Dict = {
@@ -566,6 +590,10 @@ const pt: Dict = {
   socialProofUsers: "{count} usuários",
   socialProofDeposited: "{amount} depositados",
   socialProofAvgApy: "APY médio {apy}",
+  saveAppsTitle: "🎉 Depósito bem-sucedido!",
+  saveAppsBody: "Adicione este app à tela inicial para sempre ver o melhor APY.",
+  saveAppsAdd: "⭐ Adicionar à tela inicial",
+  saveAppsLater: "Mais tarde",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };

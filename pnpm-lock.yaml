@@ -401,6 +401,9 @@ importers:
       '@coinbase/onchainkit':
         specifier: 0.38.6
         version: 0.38.6(@tanstack/query-core@5.100.9)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.1.0))(utf-8-validate@5.0.10)(zod@3.25.76)
+      '@farcaster/frame-sdk':
+        specifier: ^0.0.28
+        version: 0.0.28(typescript@5.9.3)(zod@3.25.76)
       '@tanstack/react-query':
         specifier: 5.80.6
         version: 5.80.6(react@19.1.0)
