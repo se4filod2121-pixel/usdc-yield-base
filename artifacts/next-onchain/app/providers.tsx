@@ -19,13 +19,20 @@ function buildWagmiConfig() {
   if (_wagmiConfig) return _wagmiConfig;
 
   const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+  // WalletConnect's own SDK reaches for IndexedDB (for its pairing/session
+  // store) as soon as the connector is constructed — which crashes every
+  // server render, since there's no IndexedDB in Node. wagmi's `ssr: true`
+  // only defers wagmi's *own* storage, not each connector's underlying SDK,
+  // so the walletconnect connector itself has to be skipped on the server
+  // and picked up on the client's own (separate) config build instead.
+  const isServer = typeof window === "undefined";
 
   _wagmiConfig = createConfig({
     chains: [base],
     connectors: [
       coinbaseWallet({ appName: "USDC Yield on Base" }),
       injected(),
-      ...(wcProjectId
+      ...(!isServer && wcProjectId
         ? [walletConnect({ projectId: wcProjectId, showQrModal: true })]
         : []),
     ],
