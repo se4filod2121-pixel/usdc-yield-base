@@ -64,4 +64,11 @@ export const GET = withX402(
     mimeType: "application/json",
   },
   getX402ResourceServer(),
+  undefined,
+  undefined,
+  // Don't validate the route/facilitator pairing at module load (build time,
+  // cold start) — a facilitator hiccup or config mismatch would otherwise
+  // take down `next build`/every route in this app, not just this one. The
+  // same check still runs (and fails loudly) on the first real request.
+  false,
 );

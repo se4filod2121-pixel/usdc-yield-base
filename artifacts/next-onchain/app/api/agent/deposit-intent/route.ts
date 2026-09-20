@@ -135,4 +135,9 @@ export const POST = withX402(
     mimeType: "application/json",
   },
   getX402ResourceServer(),
+  undefined,
+  undefined,
+  // See app/api/agent/vaults/route.ts — same reasoning for not validating
+  // the route/facilitator pairing at module load.
+  false,
 );
