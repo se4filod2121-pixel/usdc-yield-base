@@ -508,7 +508,9 @@ function ApySparkline({ points }: { points: number[] }) {
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-      <path d={path} fill="none" stroke={trendingUp ? "#4ade80" : "#f87171"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      {/* APY softening isn't a loss (principal is unaffected), so a downtrend
+          uses the app's neutral accent rather than alarm red. */}
+      <path d={path} fill="none" stroke={trendingUp ? "#4ade80" : "#17b8d6"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
