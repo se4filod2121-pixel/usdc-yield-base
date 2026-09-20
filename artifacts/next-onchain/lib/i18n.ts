@@ -89,6 +89,9 @@ const en = {
   notificationsSubscribe: "Subscribe",
   notificationsSubscribed: "You're subscribed",
   notificationsInvalidEmail: "Enter a valid email address",
+  showAllVaults: "Show all vaults ({count} inactive)",
+  showActiveVaultsOnly: "Show active vaults only",
+  vaultInactiveNote: "Not earning right now — no funds currently allocated",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -164,6 +167,9 @@ const tr: Dict = {
   notificationsSubscribe: "Abone ol",
   notificationsSubscribed: "Abone oldun",
   notificationsInvalidEmail: "Geçerli bir e-posta adresi gir",
+  showAllVaults: "Tüm kasaları göster ({count} pasif)",
+  showActiveVaultsOnly: "Sadece aktif kasaları göster",
+  vaultInactiveNote: "Şu an aktif getiri üretmiyor (fon tahsis edilmemiş)",
 };
 
 const de: Dict = {
@@ -236,6 +242,9 @@ const de: Dict = {
   notificationsSubscribe: "Abonnieren",
   notificationsSubscribed: "Sie sind angemeldet",
   notificationsInvalidEmail: "Geben Sie eine gültige E-Mail-Adresse ein",
+  showAllVaults: "Alle Vaults anzeigen ({count} inaktiv)",
+  showActiveVaultsOnly: "Nur aktive Vaults anzeigen",
+  vaultInactiveNote: "Erzielt derzeit keine Rendite — keine Mittel zugewiesen",
 };
 
 const zh: Dict = {
@@ -308,6 +317,9 @@ const zh: Dict = {
   notificationsSubscribe: "订阅",
   notificationsSubscribed: "您已订阅",
   notificationsInvalidEmail: "请输入有效的电子邮件地址",
+  showAllVaults: "显示所有金库（{count} 个未活跃）",
+  showActiveVaultsOnly: "仅显示活跃金库",
+  vaultInactiveNote: "目前未产生收益——尚未分配资金",
 };
 
 const es: Dict = {
@@ -380,6 +392,9 @@ const es: Dict = {
   notificationsSubscribe: "Suscribirme",
   notificationsSubscribed: "Estás suscrito",
   notificationsInvalidEmail: "Introduce un correo electrónico válido",
+  showAllVaults: "Mostrar todas las bóvedas ({count} inactivas)",
+  showActiveVaultsOnly: "Mostrar solo bóvedas activas",
+  vaultInactiveNote: "No genera rendimiento ahora mismo — sin fondos asignados",
 };
 
 const fr: Dict = {
@@ -452,6 +467,9 @@ const fr: Dict = {
   notificationsSubscribe: "S'abonner",
   notificationsSubscribed: "Vous êtes abonné",
   notificationsInvalidEmail: "Saisissez une adresse e-mail valide",
+  showAllVaults: "Afficher tous les coffres ({count} inactifs)",
+  showActiveVaultsOnly: "Afficher uniquement les coffres actifs",
+  vaultInactiveNote: "Ne génère aucun rendement actuellement — aucun fonds alloué",
 };
 
 const pt: Dict = {
@@ -524,6 +542,9 @@ const pt: Dict = {
   notificationsSubscribe: "Inscrever-se",
   notificationsSubscribed: "Você está inscrito",
   notificationsInvalidEmail: "Digite um e-mail válido",
+  showAllVaults: "Mostrar todos os cofres ({count} inativos)",
+  showActiveVaultsOnly: "Mostrar apenas cofres ativos",
+  vaultInactiveNote: "Não está rendendo no momento — sem fundos alocados",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };

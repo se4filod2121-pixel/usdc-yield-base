@@ -255,14 +255,22 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
 
 function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddress; apys: ApyMap; tvls: TvlMap; onSelect: (a: VaultAddress) => void }) {
   const { t } = useLocale();
+  const [showAll, setShowAll] = useState(false);
   const best = Object.entries(apys).reduce<{ addr: string | null; v: number }>((acc, [addr, v]) => {
     if (v != null && v > acc.v) return { addr, v };
     return acc;
   }, { addr: null, v: -Infinity }).addr;
 
+  // A vault reporting an exact 0% APY (not null/still-loading) currently has
+  // no funds allocated to any market — real, not a bug, but showing a bare
+  // "0.00%" reads as broken. Hide these by default; a visitor can still
+  // reveal them, with a note explaining why the number is zero.
+  const inactiveVaults = VAULTS.filter((v) => apys[v.address] === 0);
+  const visibleVaults = showAll ? VAULTS : VAULTS.filter((v) => apys[v.address] !== 0);
+
   return (
     <div role="listbox" aria-label={t("selectVaultAria")} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.875rem 0.875rem 0.75rem" }}>
-      {VAULTS.map((vault) => {
+      {visibleVaults.map((vault) => {
         const isSelected = vault.address === selected;
         const isBest = vault.address === best;
         const apy = apys[vault.address];
@@ -310,6 +318,11 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
                     </span>
                   )}
                 </div>
+                {apy === 0 && (
+                  <p style={{ fontSize: "0.66rem", color: "#fb923c", margin: "0.3rem 0 0", lineHeight: 1.4 }}>
+                    ⚠️ {t("vaultInactiveNote")}
+                  </p>
+                )}
               </div>
             </div>
             <div style={{
@@ -328,6 +341,16 @@ function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddres
           </button>
         );
       })}
+      {inactiveVaults.length > 0 && (
+        <button onClick={() => setShowAll((s) => !s)} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)",
+          textDecoration: "underline", textUnderlineOffset: "0.15rem",
+          padding: "0.25rem 0", alignSelf: "flex-start",
+        }}>
+          {showAll ? t("showActiveVaultsOnly") : t("showAllVaults", { count: inactiveVaults.length })}
+        </button>
+      )}
     </div>
   );
 }
