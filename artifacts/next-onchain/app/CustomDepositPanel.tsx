@@ -25,6 +25,12 @@ import {
 // Your wallet address — receives the 0.1% fee.
 const FEE_RECIPIENT = "0x39795b0eba8c9fc0c1d05e99daa4a9a799be1d31" as `0x${string}`;
 
+// No price oracle in this app (see app/api/stats/route.ts's own note on the
+// same constraint), so this is a fixed approximation of "about $0.001 of
+// ETH" rather than a live conversion — it only needs to catch "essentially
+// zero ETH", not be precise at the margin.
+const MIN_GAS_WEI = 300_000_000_000n; // ~0.0000003 ETH
+
 export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { locale, t } = useLocale();
   const { address } = useAccount();
@@ -43,6 +49,27 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const settledRef = useRef(false);
+
+  // Native ETH balance for the "not enough gas" bonus note below — only
+  // meaningful when the user is paying their own gas (isSponsored is off);
+  // when the paymaster sponsors the transaction this never needs checking.
+  const [ethBalanceWei, setEthBalanceWei] = useState<bigint | null>(null);
+  const isSponsored = process.env.NEXT_PUBLIC_PAYMASTER_ENABLED === "true";
+
+  useEffect(() => {
+    if (isSponsored || !publicClient || !address) {
+      setEthBalanceWei(null);
+      return;
+    }
+    let cancelled = false;
+    publicClient.getBalance({ address }).then(
+      (balance) => { if (!cancelled) setEthBalanceWei(balance); },
+      () => { if (!cancelled) setEthBalanceWei(null); }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [isSponsored, publicClient, address]);
 
   const clearPendingWatchers = useCallback(() => {
     if (pendingTimerRef.current) {
@@ -250,10 +277,18 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
 
   if (!vaultToken) return null;
 
+  const amountNum = amount ? parseFloat(amount) : 0;
+  const walletBalanceNum = walletBalance != null ? parseFloat(walletBalance) : null;
+  const insufficientBalance = walletBalanceNum != null && amountNum > 0 && amountNum > walletBalanceNum;
+  const insufficientGas = !isSponsored && ethBalanceWei != null && ethBalanceWei < MIN_GAS_WEI;
+
   const feeAmountPreview =
     amount && parseFloat(amount) > 0
       ? formatUnits(computeFee(parseUnits(amount, vaultToken.decimals), discounted), vaultToken.decimals)
       : "0";
+
+  const dailyEarningsPreview =
+    amountNum > 0 && apy != null ? ((amountNum * apy) / 365).toFixed(4) : null;
 
   return (
     <div style={{ padding: "1.125rem" }}>
@@ -284,6 +319,12 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         }}
       />
 
+      {dailyEarningsPreview && (
+        <p style={{ fontSize: "0.75rem", color: "#4ade80", margin: "0 0 0.375rem", fontVariantNumeric: "tabular-nums" }}>
+          {t("estimatedDailyEarnings", { amount: dailyEarningsPreview, symbol: vaultToken.symbol })}
+        </p>
+      )}
+
       <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "0 0 0.25rem", fontVariantNumeric: "tabular-nums" }}>
         {t("walletBalanceLabel")} <span style={{ color: "var(--text)", fontWeight: 600 }}>{walletBalance ?? "—"} {vaultToken.symbol}</span>
       </p>
@@ -295,6 +336,12 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
           </span>
         )}
       </p>
+
+      {insufficientGas && (
+        <p style={{ fontSize: "0.75rem", color: "#fb923c", margin: "0 0 1rem", lineHeight: 1.5 }}>
+          {t("insufficientGasNote")}
+        </p>
+      )}
 
       {isProcessing && !successMessage && !errorMessage && (
         <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "0 0 0.75rem", lineHeight: 1.5, display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -334,9 +381,13 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         key={transactionKey}
         calls={buildCalls}
         onStatus={handleStatus}
-        isSponsored={process.env.NEXT_PUBLIC_PAYMASTER_ENABLED === "true"}
+        isSponsored={isSponsored}
       >
-        <TransactionButton text={t("tabDeposit")} className="tx-button" />
+        <TransactionButton
+          text={insufficientBalance ? t("insufficientBalanceButton") : t("tabDeposit")}
+          disabled={insufficientBalance}
+          className="tx-button"
+        />
       </Transaction>
 
       <p style={{ fontSize: "0.7rem", color: "var(--muted)", margin: "0.75rem 0 0", fontVariantNumeric: "tabular-nums" }}>
