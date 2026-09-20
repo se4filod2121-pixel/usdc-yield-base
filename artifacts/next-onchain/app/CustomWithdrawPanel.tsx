@@ -9,6 +9,8 @@ import {
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
 import { useLocale } from "../lib/LocaleContext";
+import { formatHistoryTimestamp } from "../lib/format";
+import { loadHistory, saveHistoryEntry, type HistoryEntry } from "../lib/txHistory";
 import {
   friendlyError,
   localizedMessage,
@@ -74,11 +76,20 @@ export function CustomWithdrawPanel() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const settledRef = useRef(false);
   const withdrawAmountRef = useRef(withdrawAmount);
   withdrawAmountRef.current = withdrawAmount;
+
+  useEffect(() => {
+    // No wallet connected — never show a previously connected wallet's
+    // history to whoever is looking at the page now (same rule as
+    // CustomDepositPanel).
+    setHistory(address ? loadHistory(address) : []);
+  }, [address]);
 
   const clearPendingWatchers = useCallback(() => {
     if (pendingTimerRef.current) {
@@ -107,7 +118,7 @@ export function CustomWithdrawPanel() {
   // succeeded on-chain — see CustomDepositPanel — so withdraw gets the same
   // safety net).
   const finalizeSuccess = useCallback(
-    (amount: string, symbol: string) => {
+    (hash: string, amount: string, symbol: string) => {
       if (settledRef.current) return;
       settledRef.current = true;
       clearPendingWatchers();
@@ -118,8 +129,14 @@ export function CustomWithdrawPanel() {
       setTransactionKey((k) => k + 1);
       setWithdrawAmount("");
       refetchDepositedBalance();
+
+      if (address) {
+        const entry: HistoryEntry = { hash, amount, symbol, timestamp: Date.now(), type: "withdraw" };
+        saveHistoryEntry(address, entry);
+        setHistory(loadHistory(address));
+      }
     },
-    [clearPendingWatchers, refetchDepositedBalance, setWithdrawAmount, t]
+    [address, clearPendingWatchers, refetchDepositedBalance, setWithdrawAmount, t]
   );
 
   // Fallback for when the wallet has confirmed the withdrawal but
@@ -144,8 +161,9 @@ export function CustomWithdrawPanel() {
             fromBlock,
             toBlock: "latest",
           });
-          if (logs.some((log) => log.transactionHash)) {
-            finalizeSuccess(amount, symbol);
+          const burn = logs.find((log) => log.transactionHash);
+          if (burn?.transactionHash) {
+            finalizeSuccess(burn.transactionHash, amount, symbol);
             return;
           }
         } catch (err) {
@@ -193,7 +211,7 @@ export function CustomWithdrawPanel() {
       if (status?.statusName === "success" && vaultToken) {
         const hash = status?.statusData?.transactionReceipts?.[0]?.transactionHash;
         if (hash) {
-          finalizeSuccess(withdrawAmountRef.current, vaultToken.symbol);
+          finalizeSuccess(hash, withdrawAmountRef.current, vaultToken.symbol);
         }
       }
     },
@@ -217,6 +235,7 @@ export function CustomWithdrawPanel() {
   const insufficientPosition = !!withdrawAmount && parseFloat(withdrawAmount) > depositedNum;
   const exceedsLiquidity =
     maxWithdrawableNum != null && !!withdrawAmount && parseFloat(withdrawAmount) > maxWithdrawableNum;
+  const withdrawHistory = history.filter((h) => h.type === "withdraw");
 
   return (
     <div style={{ padding: "1.125rem" }}>
@@ -312,6 +331,52 @@ export function CustomWithdrawPanel() {
           />
         </Transaction>
       </div>
+
+      {address && withdrawHistory.length > 0 && (
+        <div style={{ marginTop: "1.25rem", borderTop: "1px solid var(--border)", paddingTop: "0.875rem" }}>
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
+              background: "transparent", border: "none", cursor: "pointer", padding: 0,
+              fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)",
+              textTransform: "uppercase", letterSpacing: "0.04em",
+            }}
+          >
+            {t("recentTransactions")}
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+              style={{ transform: historyOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {historyOpen && (
+            <div style={{ marginTop: "0.5rem" }}>
+              {withdrawHistory.map((h) => (
+                <a
+                  key={h.hash}
+                  href={`https://basescan.org/tx/${h.hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "0.5rem 0", textDecoration: "none", color: "var(--text)",
+                    fontSize: "0.8125rem", borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  }}
+                >
+                  <span>
+                    {t("withdrawnLine", { amount: h.amount, symbol: h.symbol })}
+                    <br />
+                    <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
+                      {formatHistoryTimestamp(h.timestamp, locale)}
+                    </span>
+                  </span>
+                  <span style={{ color: "#6e9eff", fontSize: "0.75rem", flexShrink: 0 }}>BaseScan ↗</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

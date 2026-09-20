@@ -9,3 +9,17 @@ export function formatCompactNumber(raw: string | number): string {
   if (abs >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return value.toFixed(2);
 }
+
+// Locale-aware date + time for a transaction history entry. Falls back to
+// the browser's default formatting if the locale tag isn't recognized
+// (shouldn't happen — every value here comes from our own fixed LOCALES
+// list — but a malformed date should never take down the history list).
+export function formatHistoryTimestamp(timestamp: number, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
+      new Date(timestamp)
+    );
+  } catch {
+    return new Date(timestamp).toLocaleString();
+  }
+}
