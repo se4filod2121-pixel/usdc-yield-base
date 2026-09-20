@@ -253,6 +253,59 @@ function WalletModal({ isConnected, onClose }: { isConnected: boolean; onClose: 
   );
 }
 
+function SocialProofBar({ apys, tvls }: { apys: ApyMap; tvls: TvlMap }) {
+  const { t } = useLocale();
+  const [stats, setStats] = useState<{ depositors: number; totalUsdcDeposited: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setStats({ depositors: data.depositors ?? 0, totalUsdcDeposited: data.totalUsdcDeposited ?? 0 });
+      })
+      .catch(() => {
+        if (!cancelled) setStats({ depositors: 0, totalUsdcDeposited: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Nothing to show yet is worse than nothing at all for a trust signal —
+  // a bare "0 users" line undercuts the exact confidence it's meant to build.
+  if (!stats || stats.depositors === 0) return null;
+
+  let weightedApySum = 0;
+  let tvlSum = 0;
+  for (const vault of VAULTS) {
+    const apy = apys[vault.address];
+    const tvl = tvls[vault.address];
+    if (apy != null && tvl != null) {
+      weightedApySum += apy * tvl;
+      tvlSum += tvl;
+    }
+  }
+  const avgApy = tvlSum > 0 ? weightedApySum / tvlSum : null;
+
+  return (
+    <div style={{
+      display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem 0.75rem",
+      fontSize: "0.75rem", color: "var(--muted)", margin: "0.625rem 0 0", fontVariantNumeric: "tabular-nums",
+    }}>
+      <span>👥 {t("socialProofUsers", { count: stats.depositors })}</span>
+      <span aria-hidden="true">·</span>
+      <span>💰 {t("socialProofDeposited", { amount: formatUsdCompact(stats.totalUsdcDeposited) })}</span>
+      {avgApy != null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>📈 {t("socialProofAvgApy", { apy: `${(avgApy * 100).toFixed(2)}%` })}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VaultPicker({ selected, apys, tvls, onSelect }: { selected: VaultAddress; apys: ApyMap; tvls: TvlMap; onSelect: (a: VaultAddress) => void }) {
   const { t } = useLocale();
   const [showAll, setShowAll] = useState(false);
@@ -966,6 +1019,7 @@ export default function Home() {
             <p style={{ fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5, margin: 0 }}>
               {t("earnSubtitle")}
             </p>
+            <SocialProofBar apys={apys} tvls={tvls} />
           </div>
 
           <div style={{ borderBottom: "1px solid var(--border)" }}>
