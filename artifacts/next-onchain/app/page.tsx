@@ -8,7 +8,6 @@ import { useBasename } from "../lib/useBasename";
 import { useLocale } from "../lib/LocaleContext";
 import { useReferral } from "../lib/useReferral";
 import { usePortfolio } from "../lib/usePortfolio";
-import { usePullToRefresh } from "../lib/usePullToRefresh";
 import { loadHistory } from "../lib/txHistory";
 
 const EarnProvider = dynamic(
@@ -47,24 +46,26 @@ function formatUsdCompact(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-function PullToRefreshIndicator({ pullDistance, refreshing, threshold }: { pullDistance: number; refreshing: boolean; threshold: number }) {
-  if (pullDistance === 0 && !refreshing) return null;
-  const progress = Math.min(pullDistance / threshold, 1);
-
+function RefreshButton({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
+  const { t } = useLocale();
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
-      height: refreshing ? "2.25rem" : `${pullDistance}px`,
-      overflow: "hidden", transition: refreshing ? "height 0.15s ease-out" : "none",
-    }}>
-      <span style={{
-        width: "1.125rem", height: "1.125rem", borderRadius: "50%", flexShrink: 0,
-        border: "2px solid rgba(23,184,214,0.25)", borderTopColor: "var(--accent)",
-        display: "inline-block", opacity: refreshing ? 1 : progress,
-        transform: refreshing ? undefined : `rotate(${progress * 360}deg)`,
-        animation: refreshing ? "spin 0.7s linear infinite" : undefined,
-      }} />
-    </div>
+    <button
+      onClick={onRefresh}
+      disabled={refreshing}
+      aria-label={t("refreshData")}
+      style={{
+        position: "absolute", top: "0.75rem", right: "1rem",
+        width: "2rem", height: "2rem", borderRadius: "50%", flexShrink: 0,
+        background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: refreshing ? "default" : "pointer", color: "var(--muted)", padding: 0,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+        style={{ animation: refreshing ? "spin 0.7s linear infinite" : undefined }}>
+        <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.89M13.5 2v3.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
   );
 }
 
@@ -956,16 +957,25 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+
   // Refetches every on-screen data source in place (vault APYs/TVLs/info,
   // wallet balances via refreshTick, and the deposit/withdraw panel's own
   // reads via earnKey) without a page reload, so the wallet stays connected.
+  // A plain button rather than a swipe gesture: a window-level touch/pointer
+  // listener risks fighting the browser's own scroll handling (that's
+  // exactly what a pull-to-refresh gesture tried here and broke one-finger
+  // scrolling on real touch devices) — a tap has no such failure mode.
   const handleRefresh = useCallback(async () => {
-    await loadVaultData();
-    setEarnKey((k) => k + 1);
-    setRefreshTick((t) => t + 1);
+    setManualRefreshing(true);
+    try {
+      await loadVaultData();
+      setEarnKey((k) => k + 1);
+      setRefreshTick((t) => t + 1);
+    } finally {
+      setManualRefreshing(false);
+    }
   }, [loadVaultData]);
-
-  const { pullDistance, refreshing, threshold } = usePullToRefresh(handleRefresh);
 
   const handleVaultSelect = useCallback((addr: VaultAddress) => {
     setSelectedVault(addr);
@@ -1009,8 +1019,9 @@ export default function Home() {
           "radial-gradient(circle at 80% 10%, rgba(23,184,214,0.14), transparent 45%)," +
           "var(--bg)",
         width: "100%", maxWidth: "30rem", marginInline: "auto", boxSizing: "border-box",
+        position: "relative",
       }}>
-        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} threshold={threshold} />
+        <RefreshButton onRefresh={handleRefresh} refreshing={manualRefreshing} />
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.625rem", textAlign: "center", width: "100%" }}>
           <AppIcon />
