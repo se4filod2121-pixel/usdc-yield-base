@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useAccount, useChainId, useSwitchChain, useConnect, useDisconnect } from "wagmi";
 import dynamic from "next/dynamic";
 import { base } from "viem/chains";
@@ -9,6 +9,8 @@ import { useLocale } from "../lib/LocaleContext";
 import { useReferral } from "../lib/useReferral";
 import { usePortfolio } from "../lib/usePortfolio";
 import { loadHistory } from "../lib/txHistory";
+import { VAULTS, VAULT_ADDRESSES, type VaultAddress } from "../lib/vaults";
+import { useWalletBalances } from "../lib/useWalletBalances";
 
 const EarnProvider = dynamic(
   () => import("@coinbase/onchainkit/earn").then((m) => ({ default: m.EarnProvider })),
@@ -18,26 +20,11 @@ import type { Connector } from "wagmi";
 import { CustomDepositPanel } from "./CustomDepositPanel";
 import { CustomWithdrawPanel } from "./CustomWithdrawPanel";
 
-const USDC_LOGO = "/usdc.svg";
-
-const VAULTS = [
-  { address: "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A" as `0x${string}`, name: "Spark USDC", tag: "Spark", curatorUrl: "https://spark.fi", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
-  { address: "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738" as `0x${string}`, name: "Seamless USDC", tag: "Seamless", curatorUrl: "https://seamlessprotocol.com", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
-  { address: "0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183" as `0x${string}`, name: "Steakhouse USDC", tag: "Steakhouse", curatorUrl: "https://www.steakhouse.financial", assetSymbol: "USDC", assetDecimals: 6, logo: USDC_LOGO },
-  // First non-USDC vault: verified on-chain (asset() returns Base's canonical
-  // WETH address, real bytecode, non-trivial totalAssets) before being added
-  // here — see the session notes on why that verification matters before
-  // trusting a contract address with real deposits.
-  { address: "0x27D8c7273fd3fcC6956a0B370cE5Fd4A7fc65c18" as `0x${string}`, name: "Seamless WETH Vault", tag: "Seamless", curatorUrl: "https://seamlessprotocol.com", assetSymbol: "WETH", assetDecimals: 18, logo: undefined },
-] as const;
-
-type VaultAddress = (typeof VAULTS)[number]["address"];
 type ApyMap = Record<VaultAddress, number | null>;
 type TvlMap = Record<VaultAddress, number | null>;
-type VaultMeta = { creator: string | null; timelockSec: number | null; feeRatio: number | null; apyHistory: number[] | null };
+type VaultMeta = { creator: string | null; timelockSec: number | null; feeRatio: number | null; apyHistory: number[] | null; assetAddress: `0x${string}` | null };
 type VaultMetaMap = Record<VaultAddress, VaultMeta>;
 const MAX_RETRIES = 3;
-const VAULT_ADDRESSES = VAULTS.map((v) => v.address) as VaultAddress[];
 const PORTFOLIO_VAULT_SPECS = VAULTS.map((v) => ({ address: v.address, decimals: v.assetDecimals }));
 
 function formatUsdCompact(value: number): string {
@@ -61,10 +48,11 @@ type VaultInfoResult = {
   timelockSec: number | null;
   feeRatio: number | null;
   apyHistory: number[] | null;
+  assetAddress: `0x${string}` | null;
 };
 
 const EMPTY_VAULT_INFO: VaultInfoResult = {
-  apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null, apyHistory: null,
+  apy: null, tvlUsd: null, creator: null, timelockSec: null, feeRatio: null, apyHistory: null, assetAddress: null,
 };
 
 async function fetchVaultInfo(address: string): Promise<VaultInfoResult> {
@@ -84,6 +72,7 @@ async function fetchVaultInfo(address: string): Promise<VaultInfoResult> {
     const timelock: number | undefined = state?.timelock;
     const fee: number | undefined = state?.fee;
     const historyPoints: Array<{ x: number; y: number }> | undefined = vault?.historicalState?.netApy;
+    const assetAddress: string | undefined = vault?.asset?.address;
     return {
       apy: typeof netApy === "number" ? netApy : null,
       tvlUsd: typeof totalAssetsUsd === "number" ? totalAssetsUsd : null,
@@ -93,6 +82,7 @@ async function fetchVaultInfo(address: string): Promise<VaultInfoResult> {
       apyHistory: Array.isArray(historyPoints) && historyPoints.length >= 2
         ? historyPoints.map((p) => p.y)
         : null,
+      assetAddress: typeof assetAddress === "string" ? (assetAddress as `0x${string}`) : null,
     };
   } catch {
     return EMPTY_VAULT_INFO;
@@ -640,6 +630,82 @@ function RebalanceSuggestion({ address, apys, onSwitchVault, refreshKey }: { add
   return null;
 }
 
+const IDLE_BALANCE_THRESHOLD = 1; // ignore dust below this many units of the asset
+
+// Detects USDC (or other listed-asset) sitting in the wallet that isn't
+// earning anything and nudges the user toward the best-APY vault for that
+// asset — a "cash sweep" suggestion, not an automatic sweep: like
+// RebalanceSuggestion, it only ever points at a vault, it never moves funds
+// itself. Real automatic sweeping would need a session-key/ERC-4337
+// permission grant and its own security review before it touches real
+// balances without a fresh signature each time.
+function IdleBalanceBanner({ address, apys, vaultInfos, onSwitchVault }: { address: `0x${string}`; apys: ApyMap; vaultInfos: VaultMetaMap; onSwitchVault: (addr: VaultAddress) => void }) {
+  const { t } = useLocale();
+
+  // Memoized on `vaultInfos` (only changes when a real data refresh lands,
+  // not on every render) — useWalletBalances' effect keys off this array by
+  // reference, so a fresh array on every render would re-fetch balances in
+  // a tight loop.
+  const assets = useMemo(
+    () =>
+      Array.from(
+        VAULTS.reduce((map, v) => {
+          const assetAddress = vaultInfos[v.address]?.assetAddress;
+          if (assetAddress && !map.has(v.assetSymbol)) {
+            map.set(v.assetSymbol, { address: assetAddress, symbol: v.assetSymbol, decimals: v.assetDecimals });
+          }
+          return map;
+        }, new Map<string, { address: `0x${string}`; symbol: string; decimals: number }>())
+      ).map(([, spec]) => spec),
+    [vaultInfos]
+  );
+
+  const { balances } = useWalletBalances(address, assets);
+
+  if (!balances) return null;
+
+  for (const asset of assets) {
+    const idle = balances[asset.address];
+    if (!idle || idle < IDLE_BALANCE_THRESHOLD) continue;
+
+    const best = VAULTS
+      .filter((v) => v.assetSymbol === asset.symbol)
+      .reduce<{ address: VaultAddress; name: string; apy: number } | null>((acc, v) => {
+        const apy = apys[v.address];
+        if (apy == null) return acc;
+        if (!acc || apy > acc.apy) return { address: v.address, name: v.name, apy };
+        return acc;
+      }, null);
+
+    if (!best) continue;
+
+    return (
+      <div style={{
+        ...card, padding: "1rem 1.125rem", display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: "0.75rem",
+        background: "rgba(23,184,214,0.06)", borderColor: "rgba(23,184,214,0.25)",
+      }}>
+        <p style={{ fontSize: "0.8125rem", color: "var(--text)", lineHeight: 1.5, margin: 0 }}>
+          {t("idleBalanceText", {
+            amount: idle.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+            symbol: asset.symbol,
+            apy: `${(best.apy * 100).toFixed(2)}%`,
+          })}
+        </p>
+        <button onClick={() => onSwitchVault(best.address)} style={{
+          flexShrink: 0, background: "var(--accent)", color: "#fff", border: "none",
+          borderRadius: "0.625rem", padding: "0.5rem 0.875rem", fontSize: "0.78rem", fontWeight: 700,
+          cursor: "pointer", whiteSpace: "nowrap",
+        }}>
+          {t("idleBalanceCta")}
+        </button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function PortfolioSummary({ address, refreshKey }: { address: `0x${string}`; refreshKey: number }) {
   const { t } = useLocale();
   const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
@@ -896,7 +962,7 @@ export default function Home() {
   const [tvls, setTvls] = useState<TvlMap>(
     () => Object.fromEntries(VAULT_ADDRESSES.map((a) => [a, null])) as TvlMap
   );
-  const emptyVaultMeta: VaultMeta = { creator: null, timelockSec: null, feeRatio: null, apyHistory: null };
+  const emptyVaultMeta: VaultMeta = { creator: null, timelockSec: null, feeRatio: null, apyHistory: null, assetAddress: null };
   const [vaultInfos, setVaultInfos] = useState<VaultMetaMap>(
     () => Object.fromEntries(VAULT_ADDRESSES.map((a) => [a, emptyVaultMeta])) as VaultMetaMap
   );
@@ -921,7 +987,7 @@ export default function Home() {
         });
         setVaultInfos((prev) => {
           const next = { ...prev };
-          for (const r of results) next[r.address] = { creator: r.creator, timelockSec: r.timelockSec, feeRatio: r.feeRatio, apyHistory: r.apyHistory };
+          for (const r of results) next[r.address] = { creator: r.creator, timelockSec: r.timelockSec, feeRatio: r.feeRatio, apyHistory: r.apyHistory, assetAddress: r.assetAddress };
           return next;
         });
       });
@@ -1048,6 +1114,7 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder address={address} />
+            <IdleBalanceBanner address={address} apys={apys} vaultInfos={vaultInfos} onSwitchVault={handleVaultSelect} />
             <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} refreshKey={refreshTick} />
             <PortfolioSummary address={address} refreshKey={refreshTick} />
             <ReferralBlock address={address} />
@@ -1134,6 +1201,15 @@ export default function Home() {
               style={{ color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}
             >
               {t("viewOnBasescan")}
+            </a>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: "var(--muted)" }}>
+            <a href="/transparency" style={{ color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}>
+              {t("transparencyLinkLabel")}
+            </a>
+            <span aria-hidden="true">·</span>
+            <a href="/agent" style={{ color: "var(--muted)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}>
+              {t("agentApiLinkLabel")}
             </a>
           </div>
           <p style={{ fontSize: "0.7rem", color: "var(--muted)", opacity: 0.7, maxWidth: "22rem", margin: 0, lineHeight: 1.5 }}>

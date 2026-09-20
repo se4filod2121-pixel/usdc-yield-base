@@ -24,7 +24,8 @@
     "@x402/core": "2.25.0",
     "@x402/evm": "2.25.0",
     "@x402/svm": "2.25.0",
-    "@x402/extensions": "2.25.0"
+    "@x402/extensions": "2.25.0",
+    "@x402/next": "2.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
