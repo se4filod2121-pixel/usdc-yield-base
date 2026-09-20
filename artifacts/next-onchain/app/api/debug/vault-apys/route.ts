@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 const MORPHO_GRAPHQL = "https://blue-api.morpho.org/graphql";
 
-// Temporary diagnostic route: lets us read Morpho's real current response
-// for each tracked vault from outside this sandbox's blocked network,
-// without needing a browser. Safe (read-only, no secrets) but meant to be
-// removed once the 0% APY report is root-caused.
+// Diagnostic route for reading Morpho's real current response per vault —
+// useful when investigating APY reports without a browser. Gated off by
+// default (including in production) since it has no auth of its own;
+// flip ENABLE_DEBUG_ENDPOINT=true in whichever environment needs it.
 const VAULTS = [
   { address: "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A", name: "Spark USDC" },
   { address: "0x616a4E1db48e22028f6bbf20444Cd3b8e3273738", name: "Seamless USDC" },
@@ -27,6 +27,10 @@ async function fetchRaw(address: string) {
 }
 
 export async function GET() {
+  if (process.env.ENABLE_DEBUG_ENDPOINT !== "true") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const results = await Promise.all(
     VAULTS.map(async (v) => ({ ...v, ...(await fetchRaw(v.address)) }))
   );
