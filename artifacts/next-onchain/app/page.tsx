@@ -591,9 +591,9 @@ const REBALANCE_THRESHOLD = 0.005; // 0.5 percentage points of APY
 // current one and deposit into the new one themselves, each its own signed
 // transaction. Moving a user's funds without their explicit per-transaction
 // confirmation is a trust line we deliberately don't cross.
-function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void }) {
+function RebalanceSuggestion({ address, apys, onSwitchVault, refreshKey }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void; refreshKey: number }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
 
   if (!perVaultAssets) return null;
 
@@ -640,9 +640,9 @@ function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${s
   return null;
 }
 
-function PortfolioSummary({ address }: { address: `0x${string}` }) {
+function PortfolioSummary({ address, refreshKey }: { address: `0x${string}`; refreshKey: number }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
 
   const groups = perVaultAssets
     ? Array.from(
@@ -904,9 +904,10 @@ export default function Home() {
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
   const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  useEffect(() => {
-    Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
+  const loadVaultData = useCallback(() => {
+    return Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
       .then((results) => {
         setApys((prev) => {
           const next = { ...prev };
@@ -925,6 +926,49 @@ export default function Home() {
         });
       });
   }, []);
+
+  useEffect(() => {
+    loadVaultData();
+  }, [loadVaultData]);
+
+  // Refetches every on-screen data source in place (vault APYs/TVLs/info,
+  // wallet balances via refreshTick, and the deposit/withdraw panel's own
+  // reads via earnKey) without a page reload, so the wallet stays connected.
+  const handleRefresh = useCallback(() => {
+    loadVaultData();
+    setEarnKey((k) => k + 1);
+    setRefreshTick((t) => t + 1);
+  }, [loadVaultData]);
+
+  // Triggers a refresh the first time the page is scrolled down a bit from
+  // the top, then re-arms once the user scrolls back up to the top — this
+  // reads scroll position after the browser has already handled the scroll,
+  // so unlike a touch/pointer gesture it can never interfere with scrolling
+  // itself. A cooldown keeps repeated up/down scrolling from hammering the
+  // underlying Morpho API.
+  useEffect(() => {
+    const THRESHOLD = 40;
+    const COOLDOWN_MS = 30_000;
+    let armed = true;
+    let lastTriggered = 0;
+
+    function onScroll() {
+      const y = window.scrollY;
+      if (y <= 5) {
+        armed = true;
+        return;
+      }
+      if (!armed || y < THRESHOLD) return;
+      armed = false;
+      const now = Date.now();
+      if (now - lastTriggered < COOLDOWN_MS) return;
+      lastTriggered = now;
+      handleRefresh();
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [handleRefresh]);
 
   const handleVaultSelect = useCallback((addr: VaultAddress) => {
     setSelectedVault(addr);
@@ -1004,8 +1048,8 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder address={address} />
-            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} />
-            <PortfolioSummary address={address} />
+            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} refreshKey={refreshTick} />
+            <PortfolioSummary address={address} refreshKey={refreshTick} />
             <ReferralBlock address={address} />
             <ReferralLeaderboard />
           </>
