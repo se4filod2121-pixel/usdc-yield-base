@@ -100,6 +100,7 @@ const en = {
   saveAppsAdd: "⭐ Add to Home Screen",
   saveAppsLater: "Maybe later",
   vaultAudits: "Audits",
+  vaultContinuousYield: "Interest accrues continuously — withdraw anytime, no lock-up.",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -186,6 +187,7 @@ const tr: Dict = {
   saveAppsAdd: "⭐ Ana Ekrana Ekle",
   saveAppsLater: "Daha Sonra",
   vaultAudits: "Denetim",
+  vaultContinuousYield: "Faiz sürekli birikir — istediğin an, kilit olmadan çekebilirsin.",
 };
 
 const de: Dict = {
@@ -269,6 +271,7 @@ const de: Dict = {
   saveAppsAdd: "⭐ Zum Startbildschirm hinzufügen",
   saveAppsLater: "Vielleicht später",
   vaultAudits: "Audits",
+  vaultContinuousYield: "Zinsen fallen laufend an — jederzeit ohne Sperrfrist abhebbar.",
 };
 
 const zh: Dict = {
@@ -352,6 +355,7 @@ const zh: Dict = {
   saveAppsAdd: "⭐ 添加到主屏幕",
   saveAppsLater: "以后再说",
   vaultAudits: "审计",
+  vaultContinuousYield: "利息持续累积——随时可提取，无锁定期。",
 };
 
 const es: Dict = {
@@ -435,6 +439,7 @@ const es: Dict = {
   saveAppsAdd: "⭐ Añadir a pantalla de inicio",
   saveAppsLater: "Más tarde",
   vaultAudits: "Auditorías",
+  vaultContinuousYield: "El interés se acumula continuamente — retira cuando quieras, sin bloqueo.",
 };
 
 const fr: Dict = {
@@ -518,6 +523,7 @@ const fr: Dict = {
   saveAppsAdd: "⭐ Ajouter à l'écran d'accueil",
   saveAppsLater: "Plus tard",
   vaultAudits: "Audits",
+  vaultContinuousYield: "Les intérêts s'accumulent en continu — retirez à tout moment, sans blocage.",
 };
 
 const pt: Dict = {
@@ -601,6 +607,7 @@ const pt: Dict = {
   saveAppsAdd: "⭐ Adicionar à tela inicial",
   saveAppsLater: "Mais tarde",
   vaultAudits: "Auditorias",
+  vaultContinuousYield: "Os juros acumulam continuamente — saque quando quiser, sem bloqueio.",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };

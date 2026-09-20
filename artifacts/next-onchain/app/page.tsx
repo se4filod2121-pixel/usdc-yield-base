@@ -8,6 +8,7 @@ import { useBasename } from "../lib/useBasename";
 import { useLocale } from "../lib/LocaleContext";
 import { useReferral } from "../lib/useReferral";
 import { usePortfolio } from "../lib/usePortfolio";
+import { usePullToRefresh } from "../lib/usePullToRefresh";
 import { loadHistory } from "../lib/txHistory";
 
 const EarnProvider = dynamic(
@@ -44,6 +45,27 @@ function formatUsdCompact(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
   return `$${value.toFixed(0)}`;
+}
+
+function PullToRefreshIndicator({ pullDistance, refreshing, threshold }: { pullDistance: number; refreshing: boolean; threshold: number }) {
+  if (pullDistance === 0 && !refreshing) return null;
+  const progress = Math.min(pullDistance / threshold, 1);
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      height: refreshing ? "2.25rem" : `${pullDistance}px`,
+      overflow: "hidden", transition: refreshing ? "height 0.15s ease-out" : "none",
+    }}>
+      <span style={{
+        width: "1.125rem", height: "1.125rem", borderRadius: "50%", flexShrink: 0,
+        border: "2px solid rgba(23,184,214,0.25)", borderTopColor: "var(--accent)",
+        display: "inline-block", opacity: refreshing ? 1 : progress,
+        transform: refreshing ? undefined : `rotate(${progress * 360}deg)`,
+        animation: refreshing ? "spin 0.7s linear infinite" : undefined,
+      }} />
+    </div>
+  );
 }
 
 const card: React.CSSProperties = {
@@ -535,6 +557,9 @@ function VaultDetails({ meta, curatorUrl }: { meta: VaultMeta; curatorUrl: strin
       </button>
       {open && (
         <div style={{ padding: "0 1.125rem 0.875rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <p style={{ fontSize: "0.72rem", color: "var(--muted)", lineHeight: 1.5, margin: "0 0 0.15rem" }}>
+            {t("vaultContinuousYield")}
+          </p>
           {meta.apyHistory && (
             <div style={{ display: "flex", justifyContent: "center", padding: "0.25rem 0 0.4rem" }}>
               <ApySparkline points={meta.apyHistory} />
@@ -588,9 +613,9 @@ const REBALANCE_THRESHOLD = 0.005; // 0.5 percentage points of APY
 // current one and deposit into the new one themselves, each its own signed
 // transaction. Moving a user's funds without their explicit per-transaction
 // confirmation is a trust line we deliberately don't cross.
-function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void }) {
+function RebalanceSuggestion({ address, apys, onSwitchVault, refreshKey }: { address: `0x${string}`; apys: ApyMap; onSwitchVault: (addr: VaultAddress) => void; refreshKey: number }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
 
   if (!perVaultAssets) return null;
 
@@ -637,9 +662,9 @@ function RebalanceSuggestion({ address, apys, onSwitchVault }: { address: `0x${s
   return null;
 }
 
-function PortfolioSummary({ address }: { address: `0x${string}` }) {
+function PortfolioSummary({ address, refreshKey }: { address: `0x${string}`; refreshKey: number }) {
   const { t } = useLocale();
-  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS);
+  const { perVaultAssets } = usePortfolio(address, PORTFOLIO_VAULT_SPECS, refreshKey);
 
   const groups = perVaultAssets
     ? Array.from(
@@ -901,9 +926,10 @@ export default function Home() {
   const [retryCount, setRetryCount] = useState(0);
   const [permanentError, setPermanentError] = useState(false);
   const [depositTab, setDepositTab] = useState<"deposit" | "withdraw">("deposit");
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  useEffect(() => {
-    Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
+  const loadVaultData = useCallback(() => {
+    return Promise.all(VAULTS.map((v) => fetchVaultInfo(v.address).then((info) => ({ address: v.address, ...info }))))
       .then((results) => {
         setApys((prev) => {
           const next = { ...prev };
@@ -922,6 +948,24 @@ export default function Home() {
         });
       });
   }, []);
+
+  useEffect(() => {
+    loadVaultData();
+    // Only ever runs the initial load — a pull-to-refresh re-triggers this
+    // directly through handleRefresh instead, without re-running this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refetches every on-screen data source in place (vault APYs/TVLs/info,
+  // wallet balances via refreshTick, and the deposit/withdraw panel's own
+  // reads via earnKey) without a page reload, so the wallet stays connected.
+  const handleRefresh = useCallback(async () => {
+    await loadVaultData();
+    setEarnKey((k) => k + 1);
+    setRefreshTick((t) => t + 1);
+  }, [loadVaultData]);
+
+  const { pullDistance, refreshing, threshold } = usePullToRefresh(handleRefresh);
 
   const handleVaultSelect = useCallback((addr: VaultAddress) => {
     setSelectedVault(addr);
@@ -966,6 +1010,8 @@ export default function Home() {
           "var(--bg)",
         width: "100%", maxWidth: "30rem", marginInline: "auto", boxSizing: "border-box",
       }}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} threshold={threshold} />
+
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.625rem", textAlign: "center", width: "100%" }}>
           <AppIcon />
           <h1 style={{ fontSize: "clamp(1.2rem,5vw,1.625rem)", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)", margin: 0 }}>
@@ -1001,8 +1047,8 @@ export default function Home() {
         {isConnected && address && (
           <>
             <DepositReminder address={address} />
-            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} />
-            <PortfolioSummary address={address} />
+            <RebalanceSuggestion address={address} apys={apys} onSwitchVault={handleVaultSelect} refreshKey={refreshTick} />
+            <PortfolioSummary address={address} refreshKey={refreshTick} />
             <ReferralBlock address={address} />
             <ReferralLeaderboard />
           </>
