@@ -9,7 +9,7 @@ import {
 } from "@coinbase/onchainkit/earn";
 import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
 import { computeFee } from "../lib/fee";
-import { formatCompactNumber } from "../lib/format";
+import { formatCompactNumber, formatHistoryTimestamp } from "../lib/format";
 import { useLocale } from "../lib/LocaleContext";
 import { useReferral } from "../lib/useReferral";
 import { loadHistory, saveHistoryEntry, type HistoryEntry } from "../lib/txHistory";
@@ -108,7 +108,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       // next deposit — safe now that we've already recorded this one.
       setTransactionKey((k) => k + 1);
 
-      const entry: HistoryEntry = { hash, amount: ctx.amount, symbol: ctx.symbol, timestamp: Date.now() };
+      const entry: HistoryEntry = { hash, amount: ctx.amount, symbol: ctx.symbol, timestamp: Date.now(), type: "deposit" };
       saveHistoryEntry(ctx.walletAddress, entry);
       setHistory(loadHistory(ctx.walletAddress));
       setSuccessMessage(t("depositSuccess", { amount: ctx.amount, symbol: ctx.symbol }));
@@ -290,6 +290,8 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const dailyEarningsPreview =
     amountNum > 0 && apy != null ? ((amountNum * apy) / 365).toFixed(4) : null;
 
+  const depositHistory = history.filter((h) => h.type === "deposit");
+
   return (
     <div style={{ padding: "1.125rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
@@ -398,7 +400,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         })}
       </p>
 
-      {address && history.length > 0 && (
+      {address && depositHistory.length > 0 && (
         <div style={{ marginTop: "1.25rem", borderTop: "1px solid var(--border)", paddingTop: "0.875rem" }}>
           <button
             onClick={() => setHistoryOpen((o) => !o)}
@@ -417,7 +419,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
           </button>
           {historyOpen && (
             <div style={{ marginTop: "0.5rem" }}>
-              {history.map((h) => (
+              {depositHistory.map((h) => (
                 <a
                   key={h.hash}
                   href={`https://basescan.org/tx/${h.hash}`}
@@ -429,8 +431,14 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
                     fontSize: "0.8125rem", borderBottom: "1px solid rgba(255,255,255,0.04)",
                   }}
                 >
-                  <span>{t("depositedLine", { amount: h.amount, symbol: h.symbol })}</span>
-                  <span style={{ color: "#6e9eff", fontSize: "0.75rem" }}>BaseScan ↗</span>
+                  <span>
+                    {t("depositedLine", { amount: h.amount, symbol: h.symbol })}
+                    <br />
+                    <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
+                      {formatHistoryTimestamp(h.timestamp, locale)}
+                    </span>
+                  </span>
+                  <span style={{ color: "#6e9eff", fontSize: "0.75rem", flexShrink: 0 }}>BaseScan ↗</span>
                 </a>
               ))}
             </div>
