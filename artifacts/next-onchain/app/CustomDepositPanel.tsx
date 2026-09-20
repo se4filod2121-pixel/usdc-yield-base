@@ -13,6 +13,8 @@ import { formatCompactNumber } from "../lib/format";
 import { useLocale } from "../lib/LocaleContext";
 import { useReferral } from "../lib/useReferral";
 import { loadHistory, saveHistoryEntry, type HistoryEntry } from "../lib/txHistory";
+import { hasSeenSaveCta, isEmbeddedMiniApp } from "../lib/saveToApps";
+import { SaveToAppsModal } from "./SaveToAppsModal";
 import {
   friendlyError,
   localizedMessage,
@@ -35,6 +37,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [showSaveApps, setShowSaveApps] = useState(false);
   const [transactionKey, setTransactionKey] = useState(0);
   const [showRetry, setShowRetry] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,6 +85,13 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       saveHistoryEntry(ctx.walletAddress, entry);
       setHistory(loadHistory(ctx.walletAddress));
       setSuccessMessage(t("depositSuccess", { amount: ctx.amount, symbol: ctx.symbol }));
+
+      // Only worth offering inside Base App / Farcaster's own mini-app host —
+      // calling the underlying SDK from a plain browser tab never resolves,
+      // since there's no host on the other end to answer it.
+      if (isEmbeddedMiniApp() && !hasSeenSaveCta()) {
+        setShowSaveApps(true);
+      }
 
       const parsedAmount = parseUnits(ctx.amount, ctx.decimals);
       const feeAmount = computeFee(parsedAmount, discounted);
@@ -376,6 +386,8 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
           )}
         </div>
       )}
+
+      {showSaveApps && <SaveToAppsModal onClose={() => setShowSaveApps(false)} />}
     </div>
   );
 }
