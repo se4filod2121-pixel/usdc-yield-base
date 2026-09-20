@@ -419,6 +419,9 @@ importers:
       '@x402/extensions':
         specifier: 2.25.0
         version: 2.25.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@x402/next':
+        specifier: 2.25.0
+        version: 2.25.0(bufferutil@4.1.0)(next@15.5.25(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@x402/svm':
         specifier: 2.25.0
         version: 2.25.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))
@@ -2633,6 +2636,15 @@ packages:
 
   '@x402/extensions@2.25.0':
     resolution: {integrity: sha512-7gXpYoHX8CkQ4bwUfzx0GS6VQlx810+GiGOAYhwsbTtIZFt/ahz/5CjCs7qfoKYcgAWcVyvBCl9U3FYYBX01nA==}
+
+  '@x402/next@2.25.0':
+    resolution: {integrity: sha512-LnAsuo+AidbnYpUjRqPUDnRdQwiDg9eD0GI2jb53aRskCmwcNIsuvZ9pJq6UkSoyKw/1Ez9Hzy2Ggr5UkzT5/A==}
+    peerDependencies:
+      '@x402/paywall': ^2.25.0
+      next: '>=16.2.6'
+    peerDependenciesMeta:
+      '@x402/paywall':
+        optional: true
 
   '@x402/svm@2.25.0':
     resolution: {integrity: sha512-Xs0GbtmVGiDiFz6RAuJXh0DFRbbpfXqlZzZQjX2k7O78G4gX2+segX6Aw76u4wWax7Xx+HGUBj68YPuyfPQBnw==}
@@ -8424,6 +8436,17 @@ snapshots:
       tweetnacl: 1.0.3
       viem: 2.53.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       zod: 3.25.76
+    transitivePeerDependencies:
+      - bufferutil
+      - ethers
+      - typescript
+      - utf-8-validate
+
+  '@x402/next@2.25.0(bufferutil@4.1.0)(next@15.5.25(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(typescript@5.9.3)(utf-8-validate@5.0.10)':
+    dependencies:
+      '@x402/core': 2.25.0
+      '@x402/extensions': 2.25.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      next: 15.5.25(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
     transitivePeerDependencies:
       - bufferutil
       - ethers
