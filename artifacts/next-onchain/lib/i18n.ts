@@ -99,6 +99,7 @@ const en = {
   saveAppsBody: "Add this app to your home screen so you always see the best APY.",
   saveAppsAdd: "⭐ Add to Home Screen",
   saveAppsLater: "Maybe later",
+  vaultAudits: "Audits",
 };
 
 export type TranslationKey = keyof typeof en;
@@ -184,6 +185,7 @@ const tr: Dict = {
   saveAppsBody: "Bu uygulamayı ana ekranına eklemek ister misin? Böylece her gün en iyi APY'yi görürsün.",
   saveAppsAdd: "⭐ Ana Ekrana Ekle",
   saveAppsLater: "Daha Sonra",
+  vaultAudits: "Denetim",
 };
 
 const de: Dict = {
@@ -266,6 +268,7 @@ const de: Dict = {
   saveAppsBody: "Füge diese App zu deinem Startbildschirm hinzu, um täglich die beste Rendite zu sehen.",
   saveAppsAdd: "⭐ Zum Startbildschirm hinzufügen",
   saveAppsLater: "Vielleicht später",
+  vaultAudits: "Audits",
 };
 
 const zh: Dict = {
@@ -348,6 +351,7 @@ const zh: Dict = {
   saveAppsBody: "将此应用添加到主屏幕，随时查看最佳年化收益率。",
   saveAppsAdd: "⭐ 添加到主屏幕",
   saveAppsLater: "以后再说",
+  vaultAudits: "审计",
 };
 
 const es: Dict = {
@@ -430,6 +434,7 @@ const es: Dict = {
   saveAppsBody: "Añade esta app a tu pantalla de inicio para ver siempre el mejor APY.",
   saveAppsAdd: "⭐ Añadir a pantalla de inicio",
   saveAppsLater: "Más tarde",
+  vaultAudits: "Auditorías",
 };
 
 const fr: Dict = {
@@ -512,6 +517,7 @@ const fr: Dict = {
   saveAppsBody: "Ajoutez cette appli à votre écran d'accueil pour toujours voir le meilleur APY.",
   saveAppsAdd: "⭐ Ajouter à l'écran d'accueil",
   saveAppsLater: "Plus tard",
+  vaultAudits: "Audits",
 };
 
 const pt: Dict = {
@@ -594,6 +600,7 @@ const pt: Dict = {
   saveAppsBody: "Adicione este app à tela inicial para sempre ver o melhor APY.",
   saveAppsAdd: "⭐ Adicionar à tela inicial",
   saveAppsLater: "Mais tarde",
+  vaultAudits: "Auditorias",
 };
 
 export const translations: Record<Locale, Dict> = { en, tr, de, zh, es, fr, pt };

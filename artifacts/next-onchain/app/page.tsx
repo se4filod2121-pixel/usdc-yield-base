@@ -554,6 +554,13 @@ function VaultDetails({ meta, curatorUrl }: { meta: VaultMeta; curatorUrl: strin
               {curatorUrl.replace(/^https?:\/\//, "")}
             </a>
           </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
+            <span style={{ color: "var(--muted)" }}>🔒 {t("vaultAudits")}</span>
+            <a href="https://github.com/morpho-org/metamorpho/tree/main/audits" target="_blank" rel="noopener noreferrer"
+              style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: "0.15rem" }}>
+              OpenZeppelin, Cantina ↗
+            </a>
+          </div>
           {meta.timelockSec != null && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
               <span style={{ color: "var(--muted)" }}>{t("vaultTimelock")}</span>
