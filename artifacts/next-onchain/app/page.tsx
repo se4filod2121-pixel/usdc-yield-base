@@ -496,7 +496,7 @@ function SplashScreen({ visible }: { visible: boolean }) {
       aria-hidden={!visible}
       style={{
         position: "fixed", inset: 0, zIndex: 200,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem",
         background: "var(--bg)",
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? "auto" : "none",
@@ -504,6 +504,9 @@ function SplashScreen({ visible }: { visible: boolean }) {
       }}
     >
       <AppIcon size="5.5rem" />
+      <span style={{ fontSize: "1.125rem", fontWeight: 700, letterSpacing: "-0.01em", color: "var(--text)" }}>
+        USDC Yield on Base
+      </span>
     </div>
   );
 }
