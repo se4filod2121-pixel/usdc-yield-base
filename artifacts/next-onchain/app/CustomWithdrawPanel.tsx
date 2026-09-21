@@ -147,7 +147,7 @@ export function CustomWithdrawPanel() {
     const amount = withdrawAmountRef.current;
     const symbol = vaultToken.symbol;
     let attempts = 0;
-    const MAX_ATTEMPTS = 36; // ~3 minutes at 5s
+    const MAX_ATTEMPTS = 60; // ~5 minutes at 5s — comfortably outlives PENDING_TIMEOUT_MS
     publicClient.getBlockNumber().then((fromBlock) => {
       pollTimerRef.current = setInterval(async () => {
         attempts += 1;
@@ -300,6 +300,20 @@ export function CustomWithdrawPanel() {
         </p>
       )}
 
+      {showRetry && address && (
+        <a
+          href={`https://basescan.org/address/${address}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "block", textAlign: "center", fontSize: "0.75rem",
+            color: "#6e9eff", margin: "0.75rem 0 0", textDecoration: "underline",
+          }}
+        >
+          {t("checkBasescanBeforeRetry")}
+        </a>
+      )}
+
       {showRetry && (
         <button
           type="button"
@@ -308,7 +322,7 @@ export function CustomWithdrawPanel() {
             width: "100%", boxSizing: "border-box", background: "transparent",
             border: "1.5px solid var(--border)", borderRadius: "0.875rem",
             padding: "0.625rem 1rem", fontSize: "0.8125rem", fontWeight: 600,
-            color: "var(--text)", margin: "0.75rem 0 0", cursor: "pointer",
+            color: "var(--text)", margin: "0.5rem 0 0", cursor: "pointer",
           }}
         >
           {t("startNewTransaction")}

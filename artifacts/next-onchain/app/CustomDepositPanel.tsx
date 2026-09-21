@@ -157,7 +157,7 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
       vaultAddress,
     };
     let attempts = 0;
-    const MAX_ATTEMPTS = 36; // ~3 minutes at 5s
+    const MAX_ATTEMPTS = 60; // ~5 minutes at 5s — comfortably outlives PENDING_TIMEOUT_MS
     publicClient.getBlockNumber().then((fromBlock) => {
       pollTimerRef.current = setInterval(async () => {
         attempts += 1;
@@ -362,6 +362,20 @@ export function CustomDepositPanel({ vaultAddress }: { vaultAddress: `0x${string
         <p style={{ fontSize: "0.8125rem", color: "#f87171", margin: "0 0 0.75rem", lineHeight: 1.5 }}>
           {errorMessage}
         </p>
+      )}
+
+      {showRetry && address && (
+        <a
+          href={`https://basescan.org/address/${address}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "block", textAlign: "center", fontSize: "0.75rem",
+            color: "#6e9eff", margin: "0 0 0.5rem", textDecoration: "underline",
+          }}
+        >
+          {t("checkBasescanBeforeRetry")}
+        </a>
       )}
 
       {showRetry && (
