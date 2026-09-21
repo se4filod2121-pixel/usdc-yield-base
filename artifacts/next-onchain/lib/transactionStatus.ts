@@ -51,13 +51,13 @@ const ERROR_MESSAGES: Record<string, Record<Locale, string>> = {
     zh: "出现问题，请重试。",
   },
   timeout: {
-    tr: "İşlem cüzdanınızdan çok uzun sürdü. Cüzdan uygulamanızı kontrol edin ve tekrar deneyin.",
-    en: "This is taking longer than expected. Check your wallet app and try again.",
-    es: "Esto está tardando más de lo esperado. Revisa tu billetera e intenta de nuevo.",
-    de: "Dies dauert länger als erwartet. Überprüfen Sie Ihre Wallet-App und versuchen Sie es erneut.",
-    fr: "Cela prend plus de temps que prévu. Vérifiez votre portefeuille et réessayez.",
-    pt: "Isso está demorando mais do que o esperado. Verifique seu aplicativo de carteira e tente novamente.",
-    zh: "这比预期花费的时间更长。请检查您的钱包应用并重试。",
+    tr: "İşlem beklenenden uzun sürüyor. Tekrar denemeden önce cüzdanını veya Basescan'i kontrol et — işlem zaten onaylanmış olabilir.",
+    en: "This is taking longer than expected. Before retrying, check your wallet or Basescan — the transaction may have already gone through.",
+    es: "Esto está tardando más de lo esperado. Antes de reintentar, revisa tu billetera o Basescan — la transacción puede que ya se haya completado.",
+    de: "Dies dauert länger als erwartet. Überprüfen Sie vor einem erneuten Versuch Ihre Wallet oder Basescan — die Transaktion ist möglicherweise bereits abgeschlossen.",
+    fr: "Cela prend plus de temps que prévu. Avant de réessayer, vérifiez votre portefeuille ou Basescan — la transaction a peut-être déjà abouti.",
+    pt: "Isso está demorando mais do que o esperado. Antes de tentar novamente, verifique sua carteira ou o Basescan — a transação pode já ter sido concluída.",
+    zh: "这比预期花费的时间更长。重试前请检查您的钱包或 Basescan——交易可能已经完成。",
   },
 };
 
@@ -81,7 +81,14 @@ export function friendlyError(locale: Locale, raw: string): string {
 // NOT remount/abandon the transaction on their own: a real confirmation can
 // still arrive well past this mark (mobile wallet hand-offs are slow), and
 // tearing down the listener would silently drop that success.
-export const PENDING_TIMEOUT_MS = 40_000;
+//
+// 40s used to be the cutoff here and was too tight for this app's actual
+// flow: a gasless/paymaster-sponsored deposit goes through a bundler before
+// it's even submitted on-chain, and confirmation (plus the fallback poll
+// noticing it) can legitimately take well over 40s under normal network
+// conditions — not just on a slow wallet hand-off. That produced a false
+// "timeout" error on deposits that had, in fact, already succeeded.
+export const PENDING_TIMEOUT_MS = 90_000;
 export const PENDING_STATUS_NAMES = new Set([
   "buildingTransaction",
   "transactionPending",
